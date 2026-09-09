@@ -3,12 +3,13 @@
     "name": "모아캘",
     "slug": "inbox-calendar",
     "scheme": "inboxcalendar",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gijunpark.moacal"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,17 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.gijunpark.moacal",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +56,18 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker"
     ],
-    "splash": {}
+    "splash": {},
+    "extra": {
+      "eas": {
+        "projectId": "ab64d8b7-5a87-4c95-9cab-9e1217bbe91a"
+      }
+    },
+    "owner": "gijunpark42",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ab64d8b7-5a87-4c95-9cab-9e1217bbe91a"
+    }
   }
 }

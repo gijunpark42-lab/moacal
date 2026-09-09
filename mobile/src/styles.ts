@@ -90,10 +90,12 @@ export function makeStyles(s: number) {
     dot: { width: 5, height: 5, borderRadius: 3 },
     fab: { position: "absolute", right: 20, bottom: 24, backgroundColor: ACCENT, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 },
     fabText: { color: "#fff", fontSize: 30, lineHeight: 34, fontWeight: "600" },
-    tabBar: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, borderColor: "#E4E7EC" },
-    tab: { flex: 1, alignItems: "center", paddingVertical: 10 },
-    tabText: { fontSize: 14 * s, color: "#98A2B3", fontWeight: "600" },
+    tabBar: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, borderColor: "#E4E7EC", backgroundColor: "#fff" },
+    tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 10, paddingBottom: 8, minHeight: 68 * s, gap: 2 },
+    tabIcon: { fontSize: 22 * s },
+    tabText: { fontSize: 13 * s, color: "#98A2B3", fontWeight: "700" },
     tabTextOn: { color: ACCENT },
+    tabOn: { backgroundColor: "#F0F5FF" },
   });
 }
 

@@ -2,7 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Source } from "./src/api";
 import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from "./src/calendar";
 import { appBusyBlocks, describeConflict, durationMinutes, findConflicts, freeSlots } from "./src/conflicts";
@@ -21,7 +21,7 @@ import { ReviewScreen, type Decision } from "./src/screens/ReviewScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./src/settings";
 import { loadEvents, saveEvents } from "./src/storage";
-import { BIG_FONT_SCALE, makeStyles, StylesContext } from "./src/styles";
+import { BIG_FONT_SCALE, makeStyles, StylesContext, useStyles } from "./src/styles";
 import type { BusyBlock, ParsedEvent, ReplyEvent, ScannedMessage, Slot, StoredEvent } from "./src/types";
 
 type Tab = "calendar" | "agenda" | "mail" | "settings";
@@ -33,11 +33,11 @@ type Flow =
   | { name: "edit"; event: StoredEvent }
   | { name: "mailAction"; message: ScannedMessage; action: MailAction };
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "calendar", label: "캘린더" },
-  { key: "agenda", label: "목록" },
-  { key: "mail", label: "메일" },
-  { key: "settings", label: "설정" },
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: "calendar", label: "캘린더", icon: "📅" },
+  { key: "agenda", label: "목록", icon: "📋" },
+  { key: "mail", label: "메일", icon: "✉️" },
+  { key: "settings", label: "설정", icon: "⚙️" },
 ];
 
 export default function App() {
@@ -302,18 +302,28 @@ export default function App() {
                 </Pressable>
               )}
             </View>
-            <View style={styles.tabBar}>
-              {TABS.map((t) => (
-                <Pressable key={t.key} style={styles.tab} onPress={() => setTab(t.key)}>
-                  <Text style={[styles.tabText, tab === t.key && styles.tabTextOn]}>{t.label}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <TabBar tab={tab} onChange={setTab} />
           </>
         )}
         </SafeAreaView>
       </StylesContext.Provider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+// Big, thumb-friendly bottom tabs; sits above the home indicator on phones that have one.
+function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.tabBar, { paddingBottom: insets.bottom }]}>
+      {TABS.map((t) => (
+        <Pressable key={t.key} style={[styles.tab, tab === t.key && styles.tabOn]} onPress={() => onChange(t.key)} accessibilityRole="tab">
+          <Text style={styles.tabIcon}>{t.icon}</Text>
+          <Text style={[styles.tabText, tab === t.key && styles.tabTextOn]}>{t.label}</Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
