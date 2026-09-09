@@ -5,10 +5,18 @@ import { formatShort, toDate } from "./dates";
 import type { Tone } from "./settings";
 import type { ScannedMessage } from "./types";
 
-export type Lang = "ko" | "en";
+export type Lang = "ko" | "en" | "ja" | "vi" | "zh";
 
+export const LANG_LABELS: Record<Lang, string> = { ko: "한국어", en: "English", ja: "日本語", vi: "Tiếng Việt", zh: "中文" };
+export const LANGS: Lang[] = ["ko", "en", "ja", "vi", "zh"];
+
+// Best guess from the script used; the user can always override with the language chips.
 export function detectLanguage(text: string): Lang {
-  return /[가-힣]/.test(text) ? "ko" : "en";
+  if (/[぀-ヿ]/.test(text)) return "ja"; // kana
+  if (/[가-힣]/.test(text)) return "ko";
+  if (/[一-鿿]/.test(text)) return "zh"; // CJK ideographs without kana
+  if (/[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(text)) return "vi";
+  return "en";
 }
 
 export interface MailLink {
@@ -43,6 +51,7 @@ export function extractLinks(text: string, max = 3): MailLink[] {
 function when(start: string, lang: Lang): string {
   const d = toDate(start);
   if (lang === "ko") return formatShort(d);
+  // Templates exist in Korean and English only; other languages get the English wording.
   const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return start.includes("T") ? `${day} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : day;
 }

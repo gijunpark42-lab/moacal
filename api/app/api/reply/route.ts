@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { draftReply, type ReplyEvent, type Slot } from "@/lib/reply";
+import { draftReply, LANGUAGES, type Language, type ReplyEvent, type Slot } from "@/lib/reply";
 import { errorResponse, readSource } from "@/lib/request";
 
 function eventList(value: unknown): ReplyEvent[] | null {
@@ -34,9 +34,10 @@ export async function POST(req: NextRequest) {
   }
 
   const tone = read.body.tone === "casual" ? "casual" : "formal";
+  const language = LANGUAGES.includes(read.body.language as Language) ? (read.body.language as Language) : "en";
 
   try {
-    const reply = await draftReply({ ...read.source, accepted, declined, alternatives, tone });
+    const reply = await draftReply({ ...read.source, accepted, declined, alternatives, tone, language });
     return NextResponse.json({ reply });
   } catch (error) {
     return errorResponse(error, "reply");

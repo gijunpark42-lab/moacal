@@ -2,13 +2,13 @@ import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { reply as draftReply, type Source } from "../api";
 import { formatShort, toDate } from "../dates";
-import { detectLanguage, openCompose } from "../mailTemplates";
+import { detectLanguage, LANG_LABELS, LANGS, openCompose, type Lang } from "../mailTemplates";
 import { TONE_LABELS, type Tone } from "../settings";
 import { ACCENT, useStyles } from "../styles";
 import type { ReplyEvent, Slot } from "../types";
 
 // After saving: draft a message back to whoever sent the schedule, offering free slots for anything declined.
-// Drafting costs tokens, so it only happens when the user presses the button.
+// Drafting costs tokens, so it only happens when the user taps a language chip (or "다시 만들기").
 export function ReplyScreen({
   accepted,
   declined,
@@ -26,15 +26,15 @@ export function ReplyScreen({
 }) {
   const styles = useStyles();
   const [tone, setTone] = useState<Tone>(defaultTone);
+  const [lang, setLang] = useState<Lang>(() => (source.text ? detectLanguage(source.text) : "ko"));
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const conflicted = declined.filter((d) => d.conflict);
-  const lang = source.text ? detectLanguage(source.text) : null;
 
-  const generate = async () => {
+  const generate = async (useLang: Lang = lang, useTone: Tone = tone) => {
     setBusy(true);
     try {
-      setDraft(await draftReply(source, accepted, declined, alternatives, tone));
+      setDraft(await draftReply(source, accepted, declined, alternatives, useTone, useLang));
     } catch (e) {
       Alert.alert("답장을 만들지 못했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
     } finally {
@@ -42,9 +42,15 @@ export function ReplyScreen({
     }
   };
 
+  // Tapping a language generates right away in that language (one token spend per tap).
+  const pickLang = (l: Lang) => {
+    setLang(l);
+    generate(l, tone);
+  };
+
   // The share sheet lets the user pick Gmail, KakaoTalk, Messages, etc. Sending is always their tap.
   const share = () => draft && Share.share({ message: draft });
-  // Reply to the original mail: opens the mail app prefilled, the user still hits send.
+  // Reply to the original mail in the Gmail app (falls back to the default mail app).
   const email = source.email;
   const replyByMail = () =>
     draft &&
@@ -72,27 +78,40 @@ export function ReplyScreen({
             ) : null}
           </View>
         )}
-        <Text style={styles.label}>보낸 사람에게 답장{lang ? ` · ${lang === "ko" ? "한국어" : "English"}로 작성` : ""}</Text>
+
+        <Text style={styles.label}>말투</Text>
         <View style={[styles.row, { gap: 8 }]}>
           {(["formal", "casual"] as Tone[]).map((t) => (
-            <Pressable key={t} style={[styles.chip, tone === t && styles.chipOn]} onPress={() => setTone(t)}>
+            <Pressable key={t} style={[styles.chip, tone === t && styles.chipOn]} onPress={() => setTone(t)} disabled={busy}>
               <Text style={[styles.chipText, tone === t && styles.chipTextOn]}>{TONE_LABELS[t]}</Text>
             </Pressable>
           ))}
         </View>
-        {draft === null ? (
-          <Pressable style={[styles.secondaryBtn, busy && styles.disabled]} onPress={generate} disabled={busy}>
-            {busy ? <ActivityIndicator color={ACCENT} /> : <Text style={styles.secondaryBtnText}>답장 초안 만들기</Text>}
-          </Pressable>
-        ) : (
+
+        <Text style={styles.label}>답장 언어 · 누르면 그 언어로 만들어요</Text>
+        <View style={[styles.row, { gap: 8, flexWrap: "wrap" }]}>
+          {LANGS.map((l) => (
+            <Pressable key={l} style={[styles.chip, lang === l && draft !== null && styles.chipOn, busy && styles.disabled]} onPress={() => pickLang(l)} disabled={busy}>
+              <Text style={[styles.chipText, lang === l && draft !== null && styles.chipTextOn]}>{LANG_LABELS[l]}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {busy ? (
+          <View style={[styles.row, { gap: 10, justifyContent: "center", paddingVertical: 12 }]}>
+            <ActivityIndicator color={ACCENT} />
+            <Text style={styles.hint}>{LANG_LABELS[lang]}로 답장을 쓰는 중…</Text>
+          </View>
+        ) : null}
+        {draft === null && !busy ? <Text style={styles.hint}>위에서 언어를 누르면 답장 초안이 만들어져요. (추천: {LANG_LABELS[lang]})</Text> : null}
+        {draft !== null && !busy ? (
           <>
             <TextInput style={styles.input} multiline value={draft} onChangeText={setDraft} textAlignVertical="top" />
             <Text style={styles.hint}>고쳐서 보내도 돼요. 전송은 이메일·카톡 앱에서 직접 눌러요.</Text>
-            <Pressable onPress={generate} disabled={busy} hitSlop={8}>
-              <Text style={[styles.hint, { color: ACCENT }]}>{busy ? "다시 만드는 중…" : "지금 말투로 다시 만들기"}</Text>
+            <Pressable onPress={() => generate()} hitSlop={8}>
+              <Text style={[styles.hint, { color: ACCENT }]}>지금 말투·언어로 다시 만들기</Text>
             </Pressable>
           </>
-        )}
+        ) : null}
       </ScrollView>
       {draft !== null && (
         <View style={[styles.footer, { gap: 10 }]}>
