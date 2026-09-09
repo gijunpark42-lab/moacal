@@ -69,6 +69,14 @@
 
 완료: 목 모드, 기기 캘린더 쓰기, 답장 초안, 큰 글씨 모드 (2026-09-09)
 
+## 배포 (2026-09-09)
+
+- API: Vercel 프로젝트 `inbox-calendar-api` (팀 gijun42), Root Directory `api`. 프로덕션 URL **https://inbox-calendar-api.vercel.app**
+- 프로덕션 환경변수: `ANTHROPIC_API_KEY`, `PARSE_LIVE=1`, `APP_KEY`, `PARSE_MODEL=claude-sonnet-5`. 여기서만 실제 Claude가 호출된다.
+- 재배포: `cd api && vercel --prod`. 환경변수 변경: `vercel env add NAME production`.
+- 폰 앱은 `mobile/.env`(gitignore됨)에 위 URL과 `APP_KEY`가 들어 있다. `EXPO_PUBLIC_MOCK=1`로 바꾸면 개발 모드.
+- GitHub: https://github.com/gijunpark42-lab/inbox-calendar (private)
+
 ## 실행 방법
 
 ```
