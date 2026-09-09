@@ -1,19 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { getClient, LIVE, MODEL, sourceContent, type SourceInput } from "./claude";
+import { mockParse } from "./mock";
 import { ParseResultSchema, type ParseResult } from "./schema";
 
-const client = new Anthropic();
-const MODEL = process.env.PARSE_MODEL ?? "claude-opus-5";
-
-export type ImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
-
-export interface ParseInput {
-  text?: string;
-  image?: { data: string; mediaType: ImageMediaType };
-  now: string; // device local time, "YYYY-MM-DDTHH:mm"
-  timeZone: string; // IANA, e.g. "Asia/Seoul"
-  locale?: string; // e.g. "ko-KR"
-}
+export type { ImageMediaType } from "./claude";
+export type ParseInput = SourceInput;
 
 const SYSTEM = `You extract calendar events from text or images (screenshots of chats, emails, timetables, posters, church bulletins, notices).
 
@@ -28,24 +19,16 @@ Rules:
 - If there is no event at all, return an empty events array and explain in notes.`;
 
 export async function parseEvents(input: ParseInput): Promise<ParseResult> {
-  const content: Anthropic.ContentBlockParam[] = [];
-  if (input.image) {
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: input.image.mediaType, data: input.image.data },
-    });
+  if (!LIVE) {
+    console.log("[parse] mock mode: returning fixtures (set PARSE_LIVE=1 to call Claude)");
+    return mockParse(input);
   }
-  const header = `Current local date and time: ${input.now} (${input.timeZone}${input.locale ? `, ${input.locale}` : ""}).`;
-  content.push({
-    type: "text",
-    text: input.text ? `${header}\n\nSource text:\n${input.text}` : `${header}\n\nExtract the events from the image.`,
-  });
 
-  const response = await client.messages.parse({
+  const response = await getClient().messages.parse({
     model: MODEL,
     max_tokens: 16000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content }],
+    messages: [{ role: "user", content: sourceContent(input, "Extract the events from the image.") }],
     output_config: { effort: "medium", format: zodOutputFormat(ParseResultSchema) },
   });
 

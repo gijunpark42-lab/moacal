@@ -28,6 +28,7 @@ export interface ParseResult {
 export interface StoredEvent extends ParsedEvent {
   id: string;
   createdAt: string;
+  calendarEventIds?: string[]; // ids in the phone's calendar app, if synced
 }
 
 // One row in the agenda: a stored event on a specific date (recurring events expand into many).

@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,28 +11,40 @@ import {
   SafeAreaView,
   ScrollView,
   SectionList,
+  Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { parse } from "./src/api";
+import { MOCK, parse, reply as draftReply, type Source } from "./src/api";
+import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from "./src/calendar";
 import { describeRecurrence, expand, formatDateHeader, formatTimeRange, horizon, splitStart, toDateKey } from "./src/dates";
+import { loadSettings, saveSettings, DEFAULT_SETTINGS, type Settings } from "./src/settings";
 import { loadEvents, saveEvents } from "./src/storage";
 import type { Occurrence, ParsedEvent, StoredEvent } from "./src/types";
 
-type Screen = { name: "home" } | { name: "add" } | { name: "review"; parsed: ParsedEvent[]; notes: string };
+type Screen =
+  | { name: "home" }
+  | { name: "add" }
+  | { name: "review"; parsed: ParsedEvent[]; notes: string; source: Source }
+  | { name: "reply"; accepted: ParsedEvent[]; declined: ParsedEvent[]; source: Source }
+  | { name: "settings" };
 
 const ACCENT = "#2D6CDF";
+const BIG_FONT_SCALE = 1.3;
 
 export default function App() {
   const [events, setEvents] = useState<StoredEvent[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
 
   useEffect(() => {
-    loadEvents().then((e) => {
+    Promise.all([loadEvents(), loadSettings()]).then(([e, s]) => {
       setEvents(e);
+      setSettings(s);
       setLoaded(true);
     });
   }, []);
@@ -42,32 +54,79 @@ export default function App() {
     saveEvents(next);
   }, []);
 
-  const addEvents = (parsed: ParsedEvent[]) => {
-    const createdAt = new Date().toISOString();
-    const added = parsed.map((p, i) => ({ ...p, id: `${Date.now()}-${i}`, createdAt }));
-    persist([...events, ...added]);
-    setScreen({ name: "home" });
+  const updateSettings = (next: Settings) => {
+    setSettings(next);
+    saveSettings(next);
   };
 
-  const removeEvent = (id: string) => persist(events.filter((e) => e.id !== id));
+  const addEvents = async (kept: ParsedEvent[], declined: ParsedEvent[], source: Source) => {
+    const createdAt = new Date().toISOString();
+    let added: StoredEvent[] = kept.map((p, i) => ({ ...p, id: `${Date.now()}-${i}`, createdAt }));
+    persist([...events, ...added]);
+    setScreen({ name: "reply", accepted: kept, declined, source });
+
+    if (settings.syncCalendar && added.length > 0) {
+      try {
+        if (!(await requestPermission())) {
+          Alert.alert("캘린더 권한이 없어요", "앱 안에만 저장했어요. 설정에서 캘린더 접근을 허용하면 폰 캘린더에도 넣어 드려요.");
+          return;
+        }
+        const ids = await addToDeviceCalendar(added);
+        added = added.map((e) => ({ ...e, calendarEventIds: ids[e.id] }));
+        persist([...events, ...added]);
+      } catch (e) {
+        Alert.alert("캘린더에 넣지 못했어요", e instanceof Error ? e.message : "앱 안에는 저장됐어요.");
+      }
+    }
+  };
+
+  const removeEvent = (id: string) => {
+    const target = events.find((e) => e.id === id);
+    if (target?.calendarEventIds?.length) removeFromDeviceCalendar(target.calendarEventIds);
+    persist(events.filter((e) => e.id !== id));
+  };
+
+  const styles = useMemo(() => makeStyles(settings.bigFont ? BIG_FONT_SCALE : 1), [settings.bigFont]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="dark" />
-      {!loaded ? null : screen.name === "home" ? (
-        <Home events={events} onAdd={() => setScreen({ name: "add" })} onRemove={removeEvent} />
-      ) : screen.name === "add" ? (
-        <Add onBack={() => setScreen({ name: "home" })} onParsed={(parsed, notes) => setScreen({ name: "review", parsed, notes })} />
-      ) : (
-        <Review parsed={screen.parsed} notes={screen.notes} onBack={() => setScreen({ name: "add" })} onConfirm={addEvents} />
-      )}
-    </SafeAreaView>
+    <StylesContext.Provider value={styles}>
+      <SafeAreaView style={styles.safe}>
+        <StatusBar style="dark" />
+        {!loaded ? null : screen.name === "home" ? (
+          <Home events={events} onAdd={() => setScreen({ name: "add" })} onSettings={() => setScreen({ name: "settings" })} onRemove={removeEvent} />
+        ) : screen.name === "add" ? (
+          <Add onBack={() => setScreen({ name: "home" })} onParsed={(parsed, notes, source) => setScreen({ name: "review", parsed, notes, source })} />
+        ) : screen.name === "review" ? (
+          <Review
+            parsed={screen.parsed}
+            notes={screen.notes}
+            onBack={() => setScreen({ name: "add" })}
+            onConfirm={(kept, declined) => addEvents(kept, declined, screen.source)}
+          />
+        ) : screen.name === "reply" ? (
+          <Reply accepted={screen.accepted} declined={screen.declined} source={screen.source} onDone={() => setScreen({ name: "home" })} />
+        ) : (
+          <SettingsScreen settings={settings} onChange={updateSettings} onBack={() => setScreen({ name: "home" })} />
+        )}
+      </SafeAreaView>
+    </StylesContext.Provider>
   );
 }
 
 // ---------- Home: agenda list ----------
 
-function Home({ events, onAdd, onRemove }: { events: StoredEvent[]; onAdd: () => void; onRemove: (id: string) => void }) {
+function Home({
+  events,
+  onAdd,
+  onSettings,
+  onRemove,
+}: {
+  events: StoredEvent[];
+  onAdd: () => void;
+  onSettings: () => void;
+  onRemove: (id: string) => void;
+}) {
+  const styles = useStyles();
   const today = toDateKey(new Date());
   const sections = useMemo(() => {
     const { from, to } = horizon(120);
@@ -86,6 +145,9 @@ function Home({ events, onAdd, onRemove }: { events: StoredEvent[]; onAdd: () =>
   return (
     <View style={styles.flex}>
       <View style={styles.header}>
+        <Pressable onPress={onSettings} hitSlop={12}>
+          <Text style={styles.link}>설정</Text>
+        </Pressable>
         <Text style={styles.h1}>내 일정</Text>
         <Pressable style={styles.primaryBtn} onPress={onAdd}>
           <Text style={styles.primaryBtnText}>＋ 추가</Text>
@@ -122,7 +184,8 @@ function Home({ events, onAdd, onRemove }: { events: StoredEvent[]; onAdd: () =>
 
 // ---------- Add: paste text or pick a screenshot ----------
 
-function Add({ onBack, onParsed }: { onBack: () => void; onParsed: (parsed: ParsedEvent[], notes: string) => void }) {
+function Add({ onBack, onParsed }: { onBack: () => void; onParsed: (parsed: ParsedEvent[], notes: string, source: Source) => void }) {
+  const styles = useStyles();
   const [text, setText] = useState("");
   const [image, setImage] = useState<{ uri: string; data: string; mediaType: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,9 +200,10 @@ function Add({ onBack, onParsed }: { onBack: () => void; onParsed: (parsed: Pars
   const submit = async () => {
     if (!text.trim() && !image) return;
     setBusy(true);
+    const source: Source = { text: text.trim() || undefined, image: image ? { data: image.data, mediaType: image.mediaType } : undefined };
     try {
-      const result = await parse({ text: text.trim() || undefined, image: image ? { data: image.data, mediaType: image.mediaType } : undefined });
-      onParsed(result.events, result.notes);
+      const result = await parse(source);
+      onParsed(result.events, result.notes, source);
     } catch (e) {
       Alert.alert("일정을 찾지 못했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
     } finally {
@@ -190,9 +254,21 @@ function Add({ onBack, onParsed }: { onBack: () => void; onParsed: (parsed: Pars
 
 // ---------- Review: pick which found events to keep ----------
 
-function Review({ parsed, notes, onBack, onConfirm }: { parsed: ParsedEvent[]; notes: string; onBack: () => void; onConfirm: (kept: ParsedEvent[]) => void }) {
+function Review({
+  parsed,
+  notes,
+  onBack,
+  onConfirm,
+}: {
+  parsed: ParsedEvent[];
+  notes: string;
+  onBack: () => void;
+  onConfirm: (kept: ParsedEvent[], declined: ParsedEvent[]) => void;
+}) {
+  const styles = useStyles();
   const [checked, setChecked] = useState<boolean[]>(() => parsed.map((p) => p.confidence >= 0.5));
   const kept = parsed.filter((_, i) => checked[i]);
+  const declined = parsed.filter((_, i) => !checked[i]);
   const toggle = (i: number) => setChecked((c) => c.map((v, j) => (j === i ? !v : v)));
 
   return (
@@ -233,7 +309,11 @@ function Review({ parsed, notes, onBack, onConfirm }: { parsed: ParsedEvent[]; n
         })}
       </ScrollView>
       <View style={styles.footer}>
-        <Pressable style={[styles.primaryBtn, styles.wide, kept.length === 0 && styles.disabled]} onPress={() => onConfirm(kept)} disabled={kept.length === 0}>
+        <Pressable
+          style={[styles.primaryBtn, styles.wide, kept.length === 0 && styles.disabled]}
+          onPress={() => onConfirm(kept, declined)}
+          disabled={kept.length === 0}
+        >
           <Text style={styles.primaryBtnText}>{kept.length}개 캘린더에 추가</Text>
         </Pressable>
       </View>
@@ -241,35 +321,138 @@ function Review({ parsed, notes, onBack, onConfirm }: { parsed: ParsedEvent[]; n
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff", paddingTop: Platform.OS === "android" ? 32 : 0 },
-  flex: { flex: 1 },
-  pad: { padding: 20, gap: 12 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
-  h1: { fontSize: 24, fontWeight: "700", color: "#0F1B2D" },
-  link: { fontSize: 18, color: ACCENT, width: 48 },
-  primaryBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
-  primaryBtnText: { color: "#fff", fontSize: 17, fontWeight: "700" },
-  secondaryBtn: { borderWidth: 1.5, borderColor: ACCENT, borderStyle: "dashed", padding: 22, borderRadius: 12, alignItems: "center" },
-  secondaryBtnText: { color: ACCENT, fontSize: 16, fontWeight: "600" },
-  wide: { alignSelf: "stretch" },
-  disabled: { opacity: 0.4 },
-  footer: { padding: 20, borderTopWidth: StyleSheet.hairlineWidth, borderColor: "#E4E7EC" },
-  label: { fontSize: 14, color: "#667085", fontWeight: "600" },
-  input: { minHeight: 140, borderWidth: 1, borderColor: "#D0D5DD", borderRadius: 12, padding: 14, fontSize: 17, color: "#0F1B2D" },
-  preview: { width: "100%", height: 260, borderRadius: 12, backgroundColor: "#F2F4F7" },
-  hint: { textAlign: "center", color: "#98A2B3", marginTop: 6 },
-  sectionHeader: { fontSize: 15, fontWeight: "700", color: "#667085", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6 },
-  row: { flexDirection: "row", gap: 14, paddingHorizontal: 20, paddingVertical: 12 },
-  rowTime: { width: 92, fontSize: 16, color: "#667085", paddingTop: 1 },
-  rowTitle: { fontSize: 18, color: "#0F1B2D", fontWeight: "600" },
-  rowSub: { fontSize: 15, color: "#667085", marginTop: 2 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  emptyTitle: { fontSize: 20, fontWeight: "700", color: "#0F1B2D" },
-  emptyBody: { fontSize: 16, color: "#667085", textAlign: "center", lineHeight: 24 },
-  notes: { backgroundColor: "#FFF7E6", color: "#7A4B00", padding: 12, borderRadius: 10, fontSize: 15 },
-  card: { flexDirection: "row", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#E4E7EC" },
-  cardOn: { borderColor: ACCENT, backgroundColor: "#F0F5FF" },
-  check: { fontSize: 22, color: ACCENT, paddingTop: 1 },
-  warn: { fontSize: 13, color: "#B54708", marginTop: 4 },
-});
+// ---------- Reply: draft a message back to whoever sent the schedule ----------
+
+function Reply({ accepted, declined, source, onDone }: { accepted: ParsedEvent[]; declined: ParsedEvent[]; source: Source; onDone: () => void }) {
+  const styles = useStyles();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const generate = async () => {
+    setBusy(true);
+    try {
+      setDraft(await draftReply(source, accepted, declined));
+    } catch (e) {
+      Alert.alert("답장을 만들지 못했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // The share sheet lets the user pick KakaoTalk, Messages, Mail, etc. Sending is always their tap.
+  const share = () => draft && Share.share({ message: draft });
+
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={styles.header}>
+        <View style={{ width: 48 }} />
+        <Text style={styles.h1}>저장 완료</Text>
+        <Pressable onPress={onDone} hitSlop={12}>
+          <Text style={styles.link}>완료</Text>
+        </Pressable>
+      </View>
+      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+        <Text style={styles.emptyBody}>
+          {accepted.length}개 일정을 넣었어요{declined.length ? `, ${declined.length}개는 뺐어요` : ""}.
+        </Text>
+        <Text style={styles.label}>보낸 사람에게 답장</Text>
+        {draft === null ? (
+          <Pressable style={[styles.secondaryBtn, busy && styles.disabled]} onPress={generate} disabled={busy}>
+            {busy ? <ActivityIndicator color={ACCENT} /> : <Text style={styles.secondaryBtnText}>답장 초안 만들기</Text>}
+          </Pressable>
+        ) : (
+          <>
+            <TextInput style={styles.input} multiline value={draft} onChangeText={setDraft} textAlignVertical="top" />
+            <Text style={styles.hint}>고쳐서 보내도 돼요. 전송은 카톡·문자 앱에서 직접 눌러요.</Text>
+          </>
+        )}
+      </ScrollView>
+      {draft !== null && (
+        <View style={styles.footer}>
+          <Pressable style={[styles.primaryBtn, styles.wide]} onPress={share}>
+            <Text style={styles.primaryBtnText}>카톡 · 문자로 보내기</Text>
+          </Pressable>
+        </View>
+      )}
+    </KeyboardAvoidingView>
+  );
+}
+
+// ---------- Settings ----------
+
+function SettingsScreen({ settings, onChange, onBack }: { settings: Settings; onChange: (s: Settings) => void; onBack: () => void }) {
+  const styles = useStyles();
+  const Row = ({ label, hint, value, onValueChange }: { label: string; hint: string; value: boolean; onValueChange: (v: boolean) => void }) => (
+    <View style={styles.settingRow}>
+      <View style={styles.flex}>
+        <Text style={styles.rowTitle}>{label}</Text>
+        <Text style={styles.rowSub}>{hint}</Text>
+      </View>
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: ACCENT }} />
+    </View>
+  );
+
+  return (
+    <View style={styles.flex}>
+      <View style={styles.header}>
+        <Pressable onPress={onBack} hitSlop={12}>
+          <Text style={styles.link}>‹ 뒤로</Text>
+        </Pressable>
+        <Text style={styles.h1}>설정</Text>
+        <View style={{ width: 48 }} />
+      </View>
+      <ScrollView contentContainerStyle={styles.pad}>
+        <Row label="큰 글씨" hint="글자를 크게 보여줘요" value={settings.bigFont} onValueChange={(v) => onChange({ ...settings, bigFont: v })} />
+        <Row
+          label="폰 캘린더에도 넣기"
+          hint="추가한 일정을 구글·삼성·아이폰 캘린더에도 넣어요"
+          value={settings.syncCalendar}
+          onValueChange={(v) => onChange({ ...settings, syncCalendar: v })}
+        />
+        {MOCK ? <Text style={styles.notes}>개발 모드: 샘플 데이터를 사용하고 서버에 연결하지 않아요.</Text> : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---------- Styles (font sizes scale with the big-font setting) ----------
+
+function makeStyles(s: number) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: "#fff", paddingTop: Platform.OS === "android" ? 32 : 0 },
+    flex: { flex: 1 },
+    pad: { padding: 20, gap: 12 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12 },
+    h1: { fontSize: 24 * s, fontWeight: "700", color: "#0F1B2D" },
+    link: { fontSize: 18 * s, color: ACCENT, minWidth: 48 },
+    primaryBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+    primaryBtnText: { color: "#fff", fontSize: 17 * s, fontWeight: "700" },
+    secondaryBtn: { borderWidth: 1.5, borderColor: ACCENT, borderStyle: "dashed", padding: 22, borderRadius: 12, alignItems: "center" },
+    secondaryBtnText: { color: ACCENT, fontSize: 16 * s, fontWeight: "600" },
+    wide: { alignSelf: "stretch" },
+    disabled: { opacity: 0.4 },
+    footer: { padding: 20, borderTopWidth: StyleSheet.hairlineWidth, borderColor: "#E4E7EC" },
+    label: { fontSize: 14 * s, color: "#667085", fontWeight: "600" },
+    input: { minHeight: 140, borderWidth: 1, borderColor: "#D0D5DD", borderRadius: 12, padding: 14, fontSize: 17 * s, color: "#0F1B2D" },
+    preview: { width: "100%", height: 260, borderRadius: 12, backgroundColor: "#F2F4F7" },
+    hint: { textAlign: "center", color: "#98A2B3", marginTop: 6, fontSize: 14 * s },
+    sectionHeader: { fontSize: 15 * s, fontWeight: "700", color: "#667085", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6 },
+    row: { flexDirection: "row", gap: 14, paddingHorizontal: 20, paddingVertical: 12 },
+    rowTime: { width: 92 * s, fontSize: 16 * s, color: "#667085", paddingTop: 1 },
+    rowTitle: { fontSize: 18 * s, color: "#0F1B2D", fontWeight: "600" },
+    rowSub: { fontSize: 15 * s, color: "#667085", marginTop: 2 },
+    empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
+    emptyTitle: { fontSize: 20 * s, fontWeight: "700", color: "#0F1B2D" },
+    emptyBody: { fontSize: 16 * s, color: "#667085", textAlign: "center", lineHeight: 24 * s },
+    notes: { backgroundColor: "#FFF7E6", color: "#7A4B00", padding: 12, borderRadius: 10, fontSize: 15 * s },
+    card: { flexDirection: "row", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#E4E7EC" },
+    cardOn: { borderColor: ACCENT, backgroundColor: "#F0F5FF" },
+    check: { fontSize: 22 * s, color: ACCENT, paddingTop: 1 },
+    warn: { fontSize: 13 * s, color: "#B54708", marginTop: 4 },
+    settingRow: { flexDirection: "row", alignItems: "center", gap: 16, paddingVertical: 10 },
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+const StylesContext = createContext<Styles>(makeStyles(1));
+const useStyles = () => useContext(StylesContext);
