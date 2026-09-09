@@ -44,6 +44,8 @@ export function makeStyles(s: number) {
     check: { fontSize: 22 * s, color: ACCENT, paddingTop: 1 },
     warn: { fontSize: 13 * s, color: WARN, marginTop: 4 },
     settingRow: { flexDirection: "row", alignItems: "center", gap: 16, paddingVertical: 10 },
+    fieldBtn: { borderWidth: 1, borderColor: "#D0D5DD", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+    fieldText: { fontSize: 17 * s, color: "#0F1B2D" },
     chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "#D0D5DD" },
     chipOn: { backgroundColor: ACCENT, borderColor: ACCENT },
     chipText: { fontSize: 15 * s, color: "#0F1B2D" },

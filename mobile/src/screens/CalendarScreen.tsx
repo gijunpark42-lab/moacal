@@ -10,16 +10,22 @@ export function CalendarScreen({
   phone,
   onVisibleRange,
   onRemove,
+  onSelectDate,
 }: {
   events: StoredEvent[];
   phone: BusyBlock[];
   onVisibleRange: (from: string, to: string) => void;
   onRemove: (id: string) => void;
+  onSelectDate: (date: string) => void; // so "+" can default to the tapped day
 }) {
   const styles = useStyles();
   const today = toDateKey(new Date());
   const [cursor, setCursor] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
-  const [selected, setSelected] = useState(today);
+  const [selected, setSelectedState] = useState(today);
+  const setSelected = (key: string) => {
+    setSelectedState(key);
+    onSelectDate(key);
+  };
 
   const grid = useMemo(() => monthGrid(cursor.y, cursor.m), [cursor]);
   const from = grid[0][0];

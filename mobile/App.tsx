@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, SafeAreaView, Text, View } from "react-native";
 import type { Source } from "./src/api";
 import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from "./src/calendar";
-import { appBusyBlocks, describeConflict, durationMinutes, freeSlots } from "./src/conflicts";
+import { appBusyBlocks, describeConflict, durationMinutes, findConflicts, freeSlots } from "./src/conflicts";
 import { addDays, horizon, toDateKey } from "./src/dates";
 import { cancelReminders, requestNotificationPermission, scheduleReminders } from "./src/notifications";
 import { markHandled } from "./src/gmail";
@@ -40,6 +40,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>("calendar");
   const [flow, setFlow] = useState<Flow>(null);
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date())); // day tapped in the calendar; "+" defaults to it
 
   // Phone-calendar events, keyed by id, loaded per visible range and refreshed when the app saves something.
   const [phone, setPhone] = useState<Map<string, BusyBlock>>(new Map());
@@ -97,26 +98,11 @@ export default function App() {
     [events, phone, settings.syncCalendar, windowFrom, windowTo],
   );
 
-  const confirm = async (kept: Decision[], declined: Decision[], source: Source) => {
+  // Save new events: app storage first, then the phone calendar and reminders (each best-effort).
+  const store = async (parsed: ParsedEvent[]) => {
     const createdAt = new Date().toISOString();
-    let added: StoredEvent[] = kept.map((d, i) => ({ ...d.event, id: `${Date.now()}-${i}`, createdAt }));
+    let added: StoredEvent[] = parsed.map((p, i) => ({ ...p, id: `${Date.now()}-${i}`, createdAt }));
     persist([...events, ...added]);
-
-    // Free slots to offer instead of each declined event that clashed.
-    const alternatives: Slot[] = [];
-    for (const d of declined) {
-      if (!d.conflict) continue;
-      for (const s of freeSlots(busy, durationMinutes(d.event), d.conflict.at, 7, 3)) {
-        if (!alternatives.some((a) => a.start === s.start)) alternatives.push(s);
-      }
-    }
-    const toReply = (d: Decision): ReplyEvent => ({
-      title: d.event.title,
-      start: d.event.start,
-      conflict: d.conflict ? describeConflict(d.conflict) : undefined,
-    });
-    setFlow({ name: "reply", accepted: kept.map(toReply), declined: declined.map(toReply), alternatives: alternatives.slice(0, 3), source });
-
     if (added.length === 0) return;
     if (settings.syncCalendar) {
       try {
@@ -144,6 +130,40 @@ export default function App() {
     persist([...events, ...added]);
   };
 
+  // Hand-typed event: warn about clashes, then save and go straight back to the calendar.
+  const saveManual = (event: ParsedEvent) => {
+    const { from, to } = horizon(120);
+    const conflict = findConflicts([event], busy, from, to).get(0);
+    const commit = () => {
+      store([event]);
+      setFlow(null);
+      setTab("calendar");
+    };
+    if (!conflict) return commit();
+    Alert.alert("기존 일정과 겹쳐요", describeConflict(conflict), [
+      { text: "취소", style: "cancel" },
+      { text: "그래도 추가", onPress: commit },
+    ]);
+  };
+
+  const confirm = async (kept: Decision[], declined: Decision[], source: Source) => {
+    // Free slots to offer instead of each declined event that clashed.
+    const alternatives: Slot[] = [];
+    for (const d of declined) {
+      if (!d.conflict) continue;
+      for (const s of freeSlots(busy, durationMinutes(d.event), d.conflict.at, 7, 3)) {
+        if (!alternatives.some((a) => a.start === s.start)) alternatives.push(s);
+      }
+    }
+    const toReply = (d: Decision): ReplyEvent => ({
+      title: d.event.title,
+      start: d.event.start,
+      conflict: d.conflict ? describeConflict(d.conflict) : undefined,
+    });
+    setFlow({ name: "reply", accepted: kept.map(toReply), declined: declined.map(toReply), alternatives: alternatives.slice(0, 3), source });
+    await store(kept.map((d) => d.event));
+  };
+
   // Review a mail's events; the reply can then go straight back to the sender.
   const openMail = (message: ScannedMessage) => {
     markHandled(message.id);
@@ -167,7 +187,15 @@ export default function App() {
 
   const renderFlow = () => {
     if (!flow) return null;
-    if (flow.name === "add") return <AddScreen onBack={() => setFlow(null)} onParsed={(parsed, notes, source) => setFlow({ name: "review", parsed, notes, source })} />;
+    if (flow.name === "add")
+      return (
+        <AddScreen
+          defaultDate={selectedDate}
+          onBack={() => setFlow(null)}
+          onParsed={(parsed, notes, source) => setFlow({ name: "review", parsed, notes, source })}
+          onManual={saveManual}
+        />
+      );
     if (flow.name === "review")
       return (
         <ReviewScreen
@@ -190,7 +218,9 @@ export default function App() {
         ) : (
           <>
             <View style={styles.flex}>
-              {tab === "calendar" && <CalendarScreen events={events} phone={phoneList} onVisibleRange={loadPhoneRange} onRemove={removeEvent} />}
+              {tab === "calendar" && (
+                <CalendarScreen events={events} phone={phoneList} onVisibleRange={loadPhoneRange} onRemove={removeEvent} onSelectDate={setSelectedDate} />
+              )}
               {tab === "agenda" && <AgendaScreen events={events} phone={phoneList} onRemove={removeEvent} />}
               {tab === "mail" && <MailScreen busy={busy} onOpen={openMail} />}
               {tab === "settings" && <SettingsScreen settings={settings} onChange={updateSettings} />}

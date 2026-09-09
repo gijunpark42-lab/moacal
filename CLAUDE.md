@@ -41,7 +41,8 @@
 - **리마인더 알림** — `src/notifications.ts` (expo-notifications). 설정에서 10/30/60분 전 선택. 앞으로 60일 내 최대 8회분 로컬 알림 예약. 삭제 시 취소.
 - **설정** — 큰 글씨(1.3배), 폰 캘린더 연동, 알림 시간.
 - **이미지 형식 판별** — `api/lib/request.ts`가 base64 앞부분으로 jpeg/png/webp/gif를 판별. 폰이 알려주는 mimeType은 믿지 않는다 (스크린샷 PNG를 0.6 품질로 재인코딩하면 JPEG가 되는데 라벨은 PNG라 Claude가 거절했던 버그).
-- 흐름: 캘린더/목록 → ＋ → Add → Review(충돌 확인) → Reply(대안 제안) → 돌아옴.
+- **직접 입력** — `src/screens/ManualForm.tsx`. ＋ 화면 상단 칩으로 "이메일·카톡·사진에서 찾기 / 직접 입력" 전환. 제목·날짜·시작/종료·종일·장소·매주 반복 요일. 저장 전 기존 일정과 충돌 검사(경고 후 "그래도 추가"). 캘린더에서 누른 날짜가 기본값. 날짜/시간 선택은 `@react-native-community/datetimepicker`(Expo Go 포함).
+- 흐름: 캘린더/목록 → ＋ → Add(AI 또는 직접 입력) → [AI] Review(충돌 확인) → Reply(대안 제안) → 돌아옴 / [직접] 바로 저장.
 
 **아직 없는 것**:
 - **백그라운드 메일 감시** — Gmail 연동은 됐지만(메일 탭에서 스캔), 앱을 열지 않아도 새 메일을 감지해 알림을 보내려면 서버 폴링이나 dev build의 background task가 필요.

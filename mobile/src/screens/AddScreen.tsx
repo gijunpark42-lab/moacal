@@ -4,8 +4,52 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import { parse, type Source } from "../api";
 import { useStyles } from "../styles";
 import type { ParsedEvent } from "../types";
+import { ManualForm } from "./ManualForm";
 
-export function AddScreen({ onBack, onParsed }: { onBack: () => void; onParsed: (parsed: ParsedEvent[], notes: string, source: Source) => void }) {
+type Mode = "manual" | "ai";
+
+export function AddScreen({
+  defaultDate,
+  onBack,
+  onParsed,
+  onManual,
+}: {
+  defaultDate: string;
+  onBack: () => void;
+  onParsed: (parsed: ParsedEvent[], notes: string, source: Source) => void;
+  onManual: (event: ParsedEvent) => void;
+}) {
+  const styles = useStyles();
+  const [mode, setMode] = useState<Mode>("ai");
+
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={styles.header}>
+        <Pressable onPress={onBack} hitSlop={12}>
+          <Text style={styles.link}>‹ 뒤로</Text>
+        </Pressable>
+        <Text style={styles.h1}>일정 추가</Text>
+        <View style={{ width: 48 }} />
+      </View>
+      <View style={[styles.row, { paddingHorizontal: 20, gap: 8, paddingBottom: 8 }]}>
+        {(
+          [
+            ["ai", "이메일·카톡·사진에서 찾기"],
+            ["manual", "직접 입력"],
+          ] as [Mode, string][]
+        ).map(([key, label]) => (
+          <Pressable key={key} style={[styles.chip, mode === key && styles.chipOn]} onPress={() => setMode(key)}>
+            <Text style={[styles.chipText, mode === key && styles.chipTextOn]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {mode === "manual" ? <ManualForm defaultDate={defaultDate} onSave={onManual} /> : <AiInput onParsed={onParsed} />}
+    </KeyboardAvoidingView>
+  );
+}
+
+// Paste text or pick a screenshot; the API finds the events.
+function AiInput({ onParsed }: { onParsed: (parsed: ParsedEvent[], notes: string, source: Source) => void }) {
   const styles = useStyles();
   const [text, setText] = useState("");
   const [image, setImage] = useState<{ uri: string; data: string; mediaType: string } | null>(null);
@@ -34,14 +78,7 @@ export function AddScreen({ onBack, onParsed }: { onBack: () => void; onParsed: 
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} hitSlop={12}>
-          <Text style={styles.link}>‹ 뒤로</Text>
-        </Pressable>
-        <Text style={styles.h1}>일정 추가</Text>
-        <View style={{ width: 48 }} />
-      </View>
+    <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>이메일 · 카톡 붙여넣기</Text>
         <TextInput
@@ -70,6 +107,6 @@ export function AddScreen({ onBack, onParsed }: { onBack: () => void; onParsed: 
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>일정 찾기</Text>}
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
