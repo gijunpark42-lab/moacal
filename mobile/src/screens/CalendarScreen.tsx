@@ -24,7 +24,9 @@ export function CalendarScreen({
   const grid = useMemo(() => monthGrid(cursor.y, cursor.m), [cursor]);
   const from = grid[0][0];
   const to = grid[5][6];
-  useEffect(() => onVisibleRange(from, to), [from, to, onVisibleRange]);
+  useEffect(() => {
+    onVisibleRange(from, to);
+  }, [from, to, onVisibleRange]);
 
   const byDate = useMemo(() => groupByDate(mergedItems(events, phone, from, to)), [events, phone, from, to]);
   const dayItems = byDate.get(selected) ?? [];
