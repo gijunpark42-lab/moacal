@@ -35,6 +35,7 @@
 - **캘린더 UI** — 탭 3개(캘린더 / 목록 / 설정) + "＋" 버튼. `src/screens/CalendarScreen.tsx`는 월 그리드(점: 파랑=앱 일정, 보라=폰 캘린더) + 선택한 날의 목록. `AgendaScreen`은 120일치 목록.
 - **폰 캘린더 통합** — `src/phoneCalendar.ts`가 폰 캘린더의 기존 일정(수업 등)을 읽어서 앱 일정과 같이 보여준다. 앱이 직접 만든 일정은 id로 제외해 중복 안 됨.
 - **충돌 감지 + 대안 시간** — `src/conflicts.ts`. Review 화면에서 새 일정이 기존 일정(앱+폰)과 겹치면 경고 팝업, 카드에 ⚠ 표시, 기본 체크 해제. 체크 안 한 충돌 일정에 대해 `freeSlots()`가 빈 시간 3개(원래 제안 시간에 가까운 순, 하루 1개, 09~21시)를 계산해 답장 API에 넘긴다.
+- **메일 스캔 비용 설계 (2026-09-09, 사용자가 토큰 비용 지적 후)** — 스캔은 3단계 게이트: 무료 정규식(`looksSchedulable`) → 싼 모델 YES/NO(`lib/classify.ts`, Haiku 4.5, `CLASSIFY_MODEL` env) → Sonnet 추출(effort low, max_tokens 4000, 본문 4000자). 앱은 스캔 결과·읽은 메일 ID·마지막 확인 시각을 AsyncStorage(`gmail.scan.v1`)에 캐시하고, 다음 스캔은 `since`(마지막 확인 1시간 전)와 `exclude`(읽은 ID)를 보내 새 메일만 읽는다. 메일 탭 진입 시 캐시가 있으면 절대 자동 스캔하지 않는다. 버튼을 눌러야만 새 메일 확인.
 - **답장 초안** — `POST /api/reply` (`api/lib/reply.ts`)가 수락/거절/충돌 사유/대안 시간을 받아 답장을 쓴다. 앱의 Reply 화면에서 버튼을 눌러야만 생성, 공유 시트(Gmail·카톡)로 넘김. 전송은 사용자가.
 - **폰 캘린더 쓰기** — `src/calendar.ts` (expo-calendar). 확정한 일정을 기기 캘린더에 넣고, 앱에서 지우면 캘린더에서도 지운다. 종료일 모르는 반복 일정은 16주.
 - **리마인더 알림** — `src/notifications.ts` (expo-notifications). 설정에서 10/30/60분 전 선택. 앞으로 60일 내 최대 8회분 로컬 알림 예약. 삭제 시 취소.

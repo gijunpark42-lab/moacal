@@ -160,8 +160,10 @@ export async function getProfileEmail(accessToken: string): Promise<string> {
 
 // ---- messages ------------------------------------------------------------------------------
 
-export async function listRecentMessages(accessToken: string, days: number, max: number): Promise<{ id: string; threadId: string }[]> {
-  const q = `newer_than:${days}d -category:promotions -category:social -in:spam -in:trash`;
+// `sinceMs` narrows the search to mail received after that moment (incremental scans); otherwise the last `days` days.
+export async function listRecentMessages(accessToken: string, days: number, max: number, sinceMs?: number): Promise<{ id: string; threadId: string }[]> {
+  const window = sinceMs ? `after:${Math.floor(sinceMs / 1000)}` : `newer_than:${days}d`;
+  const q = `${window} -category:promotions -category:social -in:spam -in:trash`;
   const params = new URLSearchParams({ q, maxResults: String(max) });
   const data = await gmailGet<{ messages?: { id: string; threadId: string }[] }>(accessToken, `/messages?${params}`);
   return data.messages ?? [];

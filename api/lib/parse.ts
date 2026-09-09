@@ -18,7 +18,12 @@ Rules:
 - Use confidence below 0.5 when the year, date, or time is guessed.
 - If there is no event at all, return an empty events array and explain in notes.`;
 
-export async function parseEvents(input: ParseInput): Promise<ParseResult> {
+export interface ParseOptions {
+  effort?: "low" | "medium"; // plain-text emails need less reasoning than dense timetable screenshots
+  maxTokens?: number;
+}
+
+export async function parseEvents(input: ParseInput, opts: ParseOptions = {}): Promise<ParseResult> {
   if (!LIVE) {
     console.log("[parse] mock mode: returning fixtures (set PARSE_LIVE=1 to call Claude)");
     return mockParse(input);
@@ -26,10 +31,10 @@ export async function parseEvents(input: ParseInput): Promise<ParseResult> {
 
   const response = await getClient().messages.parse({
     model: MODEL,
-    max_tokens: 16000,
+    max_tokens: opts.maxTokens ?? 16000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: sourceContent(input, "Extract the events from the image.") }],
-    output_config: { effort: "medium", format: zodOutputFormat(ParseResultSchema) },
+    output_config: { effort: opts.effort ?? "medium", format: zodOutputFormat(ParseResultSchema) },
   });
 
   if (response.stop_reason === "refusal") {

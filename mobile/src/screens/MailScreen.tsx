@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { findConflicts } from "../conflicts";
-import { horizon } from "../dates";
-import { connectGmail, disconnectGmail, getGmailConnection, loadHandled, scanGmail, type GmailConnection } from "../gmail";
+import { formatShort, horizon } from "../dates";
+import { connectGmail, disconnectGmail, getGmailConnection, loadHandled, loadScanCache, scanGmail, type GmailConnection } from "../gmail";
 import { ACCENT, useStyles } from "../styles";
 import type { BusyBlock, ScannedMessage } from "../types";
 
@@ -15,13 +15,15 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
   const [scanning, setScanning] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [scanned, setScanned] = useState<number | null>(null);
+  const [lastScanAt, setLastScanAt] = useState<number | null>(null);
 
   const scan = useCallback(async () => {
     setScanning(true);
     try {
-      const [found, done] = await Promise.all([scanGmail(7), loadHandled()]);
-      setMessages(found.messages);
-      setScanned(found.scanned);
+      const [cache, done] = await Promise.all([scanGmail(7), loadHandled()]);
+      setMessages(cache.messages);
+      setScanned(cache.lastScanned);
+      setLastScanAt(cache.lastScanAt);
       setHandled(done);
     } catch (e) {
       Alert.alert("메일을 확인하지 못했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
@@ -32,11 +34,20 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
     }
   }, []);
 
-  // Auto-scan once if already connected.
+  // Show what the last scan found. Only scan automatically when there is no cache at all,
+  // so opening this tab never re-reads (and re-pays for) mail on its own.
   useEffect(() => {
-    getGmailConnection().then((c) => {
+    Promise.all([getGmailConnection(), loadScanCache(), loadHandled()]).then(([c, cache, done]) => {
       setConnection(c);
-      if (c) scan();
+      setHandled(done);
+      if (!c) return;
+      if (cache) {
+        setMessages(cache.messages);
+        setScanned(cache.lastScanned);
+        setLastScanAt(cache.lastScanAt);
+      } else {
+        scan();
+      }
     });
   }, [scan]);
 
@@ -105,12 +116,14 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
             <Text style={[styles.hint, { marginTop: 8 }]}>메일을 읽고 일정을 찾는 중이에요. 1분 정도 걸릴 수 있어요.</Text>
           </>
         ) : (
-          <Text style={styles.secondaryBtnText}>최근 7일 메일 확인</Text>
+          <Text style={styles.secondaryBtnText}>{lastScanAt ? "새 메일 확인" : "최근 7일 메일 확인"}</Text>
         )}
       </Pressable>
       {messages !== null && !scanning ? (
         <Text style={styles.hint}>
-          최근 7일 메일 {scanned ?? 0}통 확인 · 일정 있는 메일 {messages.length}통{visible.length < messages.length ? ` · 처리한 메일 ${messages.length - visible.length}통 숨김` : ""}
+          {lastScanAt ? `마지막 확인 ${formatShort(new Date(lastScanAt))} · ` : ""}
+          {lastScanAt ? "새 메일" : "최근 7일 메일"} {scanned ?? 0}통 읽음 · 일정 있는 메일 {messages.length}통
+          {visible.length < messages.length ? ` · 처리한 메일 ${messages.length - visible.length}통 숨김` : ""}
         </Text>
       ) : null}
       {messages !== null && visible.length === 0 && !scanning ? <Text style={styles.emptyBody}>일정이 있는 메일이 없어요</Text> : null}
