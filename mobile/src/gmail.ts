@@ -46,16 +46,22 @@ export async function disconnectGmail(): Promise<void> {
 }
 
 // Messages from the last `days` days that contain at least one event, newest first.
-export async function scanGmail(days = 7): Promise<ScannedMessage[]> {
+export interface ScanResult {
+  messages: ScannedMessage[];
+  scanned: number; // how many recent mails were looked at
+}
+
+export async function scanGmail(days = 7): Promise<ScanResult> {
   if (MOCK) {
     await new Promise((r) => setTimeout(r, 600));
-    return mockGmailMessages();
+    const messages = mockGmailMessages();
+    return { messages, scanned: 12 };
   }
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
   if (!token) throw new Error("Gmail이 연결되어 있지 않아요");
   try {
-    const result = await post<{ email: string; messages: ScannedMessage[] }>("/api/gmail/scan", { token, days });
-    return result.messages;
+    const result = await post<{ email: string; messages: ScannedMessage[]; scanned?: number }>("/api/gmail/scan", { token, days });
+    return { messages: result.messages, scanned: result.scanned ?? result.messages.length };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401 && e.message === "gmail_disconnected") {
       await disconnectGmail();

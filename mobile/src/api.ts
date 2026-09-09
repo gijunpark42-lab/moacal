@@ -25,17 +25,29 @@ export class ApiError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const TIMEOUT_MS = 120_000; // a Gmail scan can take a minute; anything longer is treated as a failure, not a spinner forever
+
 export async function post<T>(path: string, body: object): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(APP_KEY ? { "x-app-key": APP_KEY } : {}) },
-    body: JSON.stringify({
-      ...body,
-      now: nowLocal(),
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      locale: "ko-KR",
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(APP_KEY ? { "x-app-key": APP_KEY } : {}) },
+      body: JSON.stringify({
+        ...body,
+        now: nowLocal(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        locale: "ko-KR",
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    throw new ApiError(0, controller.signal.aborted ? "서버 응답이 너무 오래 걸려요. 다시 시도해 주세요" : `서버에 연결하지 못했어요 (${e instanceof Error ? e.message : "network"})`);
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`);

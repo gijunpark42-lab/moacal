@@ -14,12 +14,14 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
   const [handled, setHandled] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [scanned, setScanned] = useState<number | null>(null);
 
   const scan = useCallback(async () => {
     setScanning(true);
     try {
       const [found, done] = await Promise.all([scanGmail(7), loadHandled()]);
-      setMessages(found);
+      setMessages(found.messages);
+      setScanned(found.scanned);
       setHandled(done);
     } catch (e) {
       Alert.alert("메일을 확인하지 못했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
@@ -97,8 +99,20 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
         </Pressable>
       </View>
       <Pressable style={[styles.secondaryBtn, scanning && styles.disabled]} onPress={scan} disabled={scanning}>
-        {scanning ? <ActivityIndicator color={ACCENT} /> : <Text style={styles.secondaryBtnText}>최근 7일 메일 확인</Text>}
+        {scanning ? (
+          <>
+            <ActivityIndicator color={ACCENT} />
+            <Text style={[styles.hint, { marginTop: 8 }]}>메일을 읽고 일정을 찾는 중이에요. 1분 정도 걸릴 수 있어요.</Text>
+          </>
+        ) : (
+          <Text style={styles.secondaryBtnText}>최근 7일 메일 확인</Text>
+        )}
       </Pressable>
+      {messages !== null && !scanning ? (
+        <Text style={styles.hint}>
+          최근 7일 메일 {scanned ?? 0}통 확인 · 일정 있는 메일 {messages.length}통{visible.length < messages.length ? ` · 처리한 메일 ${messages.length - visible.length}통 숨김` : ""}
+        </Text>
+      ) : null}
       {messages !== null && visible.length === 0 && !scanning ? <Text style={styles.emptyBody}>일정이 있는 메일이 없어요</Text> : null}
       {visible.map((m) => {
         const conflict = findConflicts(m.events, busy, from, to).size > 0;

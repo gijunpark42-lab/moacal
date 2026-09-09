@@ -50,9 +50,11 @@ export async function POST(req: NextRequest) {
   if (!stored) return NextResponse.json({ error: "gmail_disconnected" }, { status: 401 });
 
   try {
+    const started = Date.now();
     const accessToken = await refreshAccessToken(stored.refresh_token);
     const ids = await listRecentMessages(accessToken, days, max);
     const results: (ScannedMessage | null)[] = new Array(ids.length).fill(null);
+    let candidates = 0;
 
     // At most CONCURRENCY messages are fetched + parsed at a time.
     let next = 0;
@@ -61,6 +63,7 @@ export async function POST(req: NextRequest) {
         const i = next++;
         const mail = await getMessage(accessToken, ids[i].id);
         if (!looksSchedulable(`${mail.subject}\n${mail.text}`)) continue;
+        candidates++;
         const text = `Subject: ${mail.subject}\nFrom: ${mail.from} <${mail.fromEmail}>\nDate: ${mail.date}\n\n${mail.text}`;
         const parsed = await parseEvents({ text, now, timeZone, locale: typeof locale === "string" ? locale : undefined });
         if (parsed.events.length === 0) continue;
@@ -72,7 +75,9 @@ export async function POST(req: NextRequest) {
     const messages = results
       .filter((m): m is ScannedMessage => m !== null)
       .sort((a, b) => b.date.localeCompare(a.date));
-    return NextResponse.json({ email: stored.email, messages });
+    // Counts only, no content: enough to tell "nothing matched" from "something broke" in the logs.
+    console.log(`[gmail] scan: listed ${ids.length}, prefilter passed ${candidates}, with events ${messages.length}, ${Date.now() - started}ms`);
+    return NextResponse.json({ email: stored.email, messages, scanned: ids.length, candidates });
   } catch (error) {
     if (error instanceof GmailDisconnectedError) {
       return NextResponse.json({ error: "gmail_disconnected" }, { status: 401 });
