@@ -3,13 +3,15 @@ import { Platform, StyleSheet } from "react-native";
 
 export const ACCENT = "#2D6CDF";
 export const PHONE_COLOR = "#7A5AF8"; // events that come from the phone calendar
+export const HOLIDAY_COLOR = "#E05252"; // public holidays and Sundays
+export const SATURDAY_COLOR = "#3B7DDD";
 export const WARN = "#B54708";
 export const BIG_FONT_SCALE = 1.3;
 
 // Font sizes scale with the big-font setting; everything else stays fixed.
 export function makeStyles(s: number) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: "#fff", paddingTop: Platform.OS === "android" ? 32 : 0 },
+    safe: { flex: 1, backgroundColor: "#fff" },
     flex: { flex: 1 },
     row: { flexDirection: "row", alignItems: "center" },
     pad: { padding: 20, gap: 12 },
@@ -38,7 +40,20 @@ export function makeStyles(s: number) {
     emptyTitle: { fontSize: 20 * s, fontWeight: "700", color: "#0F1B2D" },
     emptyBody: { fontSize: 16 * s, color: "#667085", textAlign: "center", lineHeight: 24 * s },
     notes: { backgroundColor: "#FFF7E6", color: "#7A4B00", padding: 12, borderRadius: 10, fontSize: 15 * s },
-    card: { flexDirection: "row", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#E4E7EC" },
+    card: {
+      flexDirection: "row",
+      gap: 12,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: "#E4E7EC",
+      backgroundColor: "#fff",
+      shadowColor: "#0F1B2D",
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
     cardOn: { borderColor: ACCENT, backgroundColor: "#F0F5FF" },
     cardConflict: { borderColor: "#F79009", backgroundColor: "#FFFAEB" },
     check: { fontSize: 22 * s, color: ACCENT, paddingTop: 1 },
@@ -66,8 +81,11 @@ export function makeStyles(s: number) {
     dayCell: { flex: 1, alignItems: "center", paddingVertical: 4, minHeight: 44 * s },
     dayNum: { fontSize: 15 * s, color: "#0F1B2D", width: 30 * s, height: 30 * s, lineHeight: 30 * s, textAlign: "center", borderRadius: 15 * s, overflow: "hidden" },
     dayNumMuted: { color: "#C0C6D0" },
-    dayNumToday: { color: ACCENT, fontWeight: "700" },
-    dayNumSelected: { backgroundColor: ACCENT, color: "#fff", fontWeight: "700" },
+    dayNumHoliday: { color: HOLIDAY_COLOR },
+    dayNumSaturday: { color: SATURDAY_COLOR },
+    dayNumToday: { fontWeight: "800", borderWidth: 2, borderColor: ACCENT },
+    dayNumSelected: { backgroundColor: ACCENT, color: "#fff", fontWeight: "700", borderColor: ACCENT },
+    holidayLabel: { fontSize: 9 * s, color: HOLIDAY_COLOR, marginTop: 1, maxWidth: 44 * s, textAlign: "center" },
     dots: { flexDirection: "row", gap: 3, height: 6, marginTop: 2 },
     dot: { width: 5, height: 5, borderRadius: 3 },
     fab: { position: "absolute", right: 20, bottom: 24, backgroundColor: ACCENT, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 },

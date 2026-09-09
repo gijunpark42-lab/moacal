@@ -16,12 +16,23 @@ export async function requestPermission(): Promise<boolean> {
   return status === "granted";
 }
 
-async function writableCalendar(): Promise<Calendar.ExpoCalendar | null> {
-  if (Platform.OS === "ios") return Calendar.getDefaultCalendarSync();
+// The calendar new events are written to. iOS: the system default (falls back to any writable one, e.g. when iCloud
+// calendar is off); Android: the primary account calendar, else Google, else the first writable.
+export async function pickWritableCalendar(): Promise<Calendar.ExpoCalendar | null> {
+  if (Platform.OS === "ios") {
+    try {
+      const def = Calendar.getDefaultCalendarSync();
+      if (def?.allowsModifications !== false) return def;
+    } catch {
+      // no default calendar (iCloud off, no accounts); fall through to the list
+    }
+  }
   const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
   const writable = calendars.filter((c) => c.allowsModifications);
   return writable.find((c) => c.isPrimary) ?? writable.find((c) => c.source?.type === "com.google") ?? writable[0] ?? null;
 }
+
+const writableCalendar = pickWritableCalendar;
 
 function details(event: StoredEvent, start: Date, rule?: Calendar.RecurrenceRule): EventDetails {
   const end = event.all_day ? new Date(start.getTime() + DAY) : event.end ? toDate(event.end) : new Date(start.getTime() + HOUR);

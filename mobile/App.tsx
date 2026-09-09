@@ -1,7 +1,8 @@
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, SafeAreaView, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import type { Source } from "./src/api";
 import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from "./src/calendar";
 import { appBusyBlocks, describeConflict, durationMinutes, findConflicts, freeSlots } from "./src/conflicts";
@@ -80,12 +81,19 @@ export default function App() {
     });
   }, []);
 
-  // Conflict checks look 120 days ahead, so keep that window loaded.
+  // Conflict checks look 120 days ahead, so keep that window loaded. Ask for calendar access up front:
+  // without it the phone's own events never show up, which reads as "sync is broken".
+  const refreshPhone = useCallback(async () => {
+    const { from, to } = horizon(120);
+    if (settings.syncCalendar) await requestPermission().catch(() => false);
+    loadedRanges.current.clear();
+    await loadPhoneRange(from, to, true);
+  }, [settings.syncCalendar, loadPhoneRange]);
+
   useEffect(() => {
     if (!loaded) return;
-    const { from, to } = horizon(120);
-    loadPhoneRange(from, to);
-  }, [loaded, loadPhoneRange]);
+    refreshPhone();
+  }, [loaded, refreshPhone]);
 
   const persist = useCallback((next: StoredEvent[]) => {
     setEvents(next);
@@ -266,8 +274,9 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
+      <SafeAreaProvider>
       <StylesContext.Provider value={styles}>
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
           <StatusBar style="dark" />
         {!loaded ? null : flow ? (
           renderFlow()
@@ -286,7 +295,7 @@ export default function App() {
               )}
               {tab === "agenda" && <AgendaScreen events={events} phone={phoneList} onRemove={removeEvent} onEdit={(event) => setFlow({ name: "edit", event })} />}
               {tab === "mail" && <MailScreen busy={busy} onOpen={openMail} onAction={(message, action) => setFlow({ name: "mailAction", message, action })} />}
-              {tab === "settings" && <SettingsScreen settings={settings} onChange={updateSettings} />}
+              {tab === "settings" && <SettingsScreen settings={settings} onChange={updateSettings} onRefreshCalendar={refreshPhone} />}
               {tab !== "settings" && (
                 <Pressable style={styles.fab} onPress={() => setFlow({ name: "add" })} accessibilityLabel="일정 추가">
                   <Text style={styles.fabText}>＋</Text>
@@ -304,6 +313,7 @@ export default function App() {
         )}
         </SafeAreaView>
       </StylesContext.Provider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

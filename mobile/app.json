@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "일정비서",
+    "name": "모아캘",
     "slug": "inbox-calendar",
     "scheme": "inboxcalendar",
     "version": "1.0.0",
@@ -44,6 +44,7 @@
       "expo-web-browser",
       "expo-secure-store",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "splash": {}
   }
 }

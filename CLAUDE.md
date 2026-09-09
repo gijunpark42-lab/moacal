@@ -1,4 +1,4 @@
-# Inbox → Calendar (가칭: 일정비서)
+# 모아캘 (Inbox → Calendar)
 
 이 파일은 이 프로젝트가 **무엇을, 왜, 어떻게** 만드는지 적어둔 것이다. 새 세션에서 Claude Code를 열면 이 파일부터 읽고 이어서 작업한다.
 
@@ -41,6 +41,10 @@
 - **리마인더 알림** — `src/notifications.ts` (expo-notifications). 설정에서 10/30/60분 전 선택. 앞으로 60일 내 최대 8회분 로컬 알림 예약. 삭제 시 취소.
 - **설정** — 큰 글씨(1.3배), 폰 캘린더 연동, 알림 시간.
 - **이미지 형식 판별** — `api/lib/request.ts`가 base64 앞부분으로 jpeg/png/webp/gif를 판별. 폰이 알려주는 mimeType은 믿지 않는다 (스크린샷 PNG를 0.6 품질로 재인코딩하면 JPEG가 되는데 라벨은 PNG라 Claude가 거절했던 버그).
+- **앱 이름·아이콘 (2026-09-09)** — 앱 이름 "모아캘"(이메일·카톡·사진의 일정을 모아 캘린더에). `app.json` name, Google OAuth 동의화면 앱 이름도 동일. 아이콘은 `mobile/assets/*.png`(GDI+ 스크립트로 생성: 파랑→보라 그라데이션 + 흰 캘린더 + 앱/폰/공휴일 색 점). 후보였던 이름: 하루모아, 일정온, 인박스캘린더.
+- **한국 공휴일** — `src/holidays.ts` 정적 표, 대체공휴일 포함 2027-12까지(규정: 설·추석은 일요일/다른 공휴일 겹침만, 삼일절·어린이날·광복절·개천절·한글날·부처님오신날·성탄절은 토·일 겹침도 대체, 신정·현충일 대체 없음). 캘린더에 빨간 날짜+이름, 목록에 "공휴일" 행. 충돌 검사엔 안 들어감. 매년 표 연장 필요.
+- **폰 캘린더 연동 수정** — 예전엔 일정을 추가하는 순간에만 권한을 요청해서 그 전엔 폰 일정이 안 보였음. 이제 앱 시작 시 권한 요청 후 로드, 설정에 연동 상태(권한·캘린더 수·쓰는 캘린더 이름)와 "권한 요청/설정 열기" 표시. iOS 기본 캘린더가 없으면 쓰기 가능한 첫 캘린더로 폴백.
+- **SafeArea** — react-native-safe-area-context의 SafeAreaProvider/SafeAreaView 사용(RN 기본 SafeAreaView deprecated).
 - **직접 입력** — `src/screens/ManualForm.tsx`. ＋ 화면 상단 칩으로 "이메일·카톡·사진에서 찾기 / 직접 입력" 전환. 제목·날짜·시작/종료·종일·장소·매주 반복 요일. 저장 전 기존 일정과 충돌 검사(경고 후 "그래도 추가"). 캘린더에서 누른 날짜가 기본값. 날짜/시간 선택은 `@react-native-community/datetimepicker`(Expo Go 포함).
 - **스와이프 액션** — `src/components/SwipeRow.tsx`(react-native-gesture-handler Swipeable, 루트는 GestureHandlerRootView). 일정 행: 수정/삭제(길게 누르기 없음). 수정은 ManualForm에 initial을 넣어 `updateEvent()`(폰 캘린더·알림 지우고 다시 붙임). 메일 카드: 시간 변경 / 취소 메일 / 숨기기.
 - **메일 탭 표시 규칙** — 캐시된 메일 중 최근 7일치는 처리(검토)했든 안 했든 전부 보여줌(처리됨 배지, 흐리게). 보낸 사람 이메일 주소 그대로 표시, 본문의 Zoom/Meet/Teams/기타 링크 칩(탭하면 열림). 전부 토큰 0.

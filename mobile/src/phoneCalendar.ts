@@ -1,5 +1,6 @@
 // Reads what is already in the phone's calendar app so the agenda and conflict checks see the user's real schedule.
 import * as Calendar from "expo-calendar";
+import { pickWritableCalendar } from "./calendar";
 import type { BusyBlock } from "./types";
 
 export async function hasCalendarPermission(): Promise<boolean> {
@@ -22,4 +23,23 @@ export async function listPhoneEvents(from: Date, to: Date, ownIds: Set<string>)
     out.push({ id: e.id, title: e.title || "(제목 없음)", start, end, allDay: !!e.allDay, source: "phone" });
   }
   return out;
+}
+
+// What the settings screen shows so the user (and we) can tell why sync is or isn't working.
+export interface CalendarStatus {
+  permission: "granted" | "denied" | "undetermined";
+  calendars: number;
+  writable: string | null; // title of the calendar new events go into
+}
+
+export async function calendarStatus(): Promise<CalendarStatus> {
+  const { status, canAskAgain } = await Calendar.getCalendarPermissions();
+  if (status !== "granted") return { permission: status === "denied" || !canAskAgain ? "denied" : "undetermined", calendars: 0, writable: null };
+  try {
+    const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+    const target = await pickWritableCalendar();
+    return { permission: "granted", calendars: calendars.length, writable: target?.title ?? null };
+  } catch {
+    return { permission: "granted", calendars: 0, writable: null };
+  }
 }

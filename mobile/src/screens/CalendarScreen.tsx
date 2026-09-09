@@ -3,7 +3,8 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { groupByDate, mergedItems, type DayItem } from "../agenda";
 import { formatDateHeader, KO_DAYS, monthGrid, toDateKey } from "../dates";
 import { SwipeRow } from "../components/SwipeRow";
-import { ACCENT, PHONE_COLOR, useStyles } from "../styles";
+import { HOLIDAYS } from "../holidays";
+import { ACCENT, HOLIDAY_COLOR, PHONE_COLOR, SATURDAY_COLOR, useStyles } from "../styles";
 import type { BusyBlock, StoredEvent } from "../types";
 
 export function CalendarScreen({
@@ -68,33 +69,43 @@ export function CalendarScreen({
       </View>
       <View style={styles.weekRow}>
         {KO_DAYS.map((d, i) => (
-          <Text key={d} style={[styles.weekdayCell, i === 0 && { color: "#E05252" }, i === 6 && { color: ACCENT }]}>
+          <Text key={d} style={[styles.weekdayCell, i === 0 && { color: HOLIDAY_COLOR }, i === 6 && { color: SATURDAY_COLOR }]}>
             {d}
           </Text>
         ))}
       </View>
       {grid.map((row, r) => (
         <View key={r} style={styles.weekRow}>
-          {row.map((key) => {
+          {row.map((key, col) => {
             const items = byDate.get(key) ?? [];
             const hasApp = items.some((i) => i.source === "app");
             const hasPhone = items.some((i) => i.source === "phone");
+            const holiday = HOLIDAYS[key];
+            const isSelected = key === selected;
             return (
               <Pressable key={key} style={styles.dayCell} onPress={() => setSelected(key)}>
                 <Text
                   style={[
                     styles.dayNum,
+                    (holiday || col === 0) && styles.dayNumHoliday,
+                    col === 6 && !holiday && styles.dayNumSaturday,
                     !inMonth(key) && styles.dayNumMuted,
                     key === today && styles.dayNumToday,
-                    key === selected && styles.dayNumSelected,
+                    isSelected && styles.dayNumSelected,
                   ]}
                 >
                   {Number(key.slice(8, 10))}
                 </Text>
-                <View style={styles.dots}>
-                  {hasApp && <View style={[styles.dot, { backgroundColor: ACCENT }]} />}
-                  {hasPhone && <View style={[styles.dot, { backgroundColor: PHONE_COLOR }]} />}
-                </View>
+                {holiday && inMonth(key) ? (
+                  <Text style={styles.holidayLabel} numberOfLines={1}>
+                    {holiday.replace(/^대체공휴일.*$/, "대체휴일")}
+                  </Text>
+                ) : (
+                  <View style={styles.dots}>
+                    {hasApp && <View style={[styles.dot, { backgroundColor: ACCENT }]} />}
+                    {hasPhone && <View style={[styles.dot, { backgroundColor: PHONE_COLOR }]} />}
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -117,7 +128,7 @@ export function DayRow({ item, onRemove, onEdit }: { item: DayItem; onRemove: (i
   const styles = useStyles();
   const row = (
     <View style={[styles.eventRow, { backgroundColor: "#fff" }]}>
-      <View style={[styles.eventBar, item.source === "phone" && { backgroundColor: PHONE_COLOR }]} />
+      <View style={[styles.eventBar, item.source === "phone" && { backgroundColor: PHONE_COLOR }, item.source === "holiday" && { backgroundColor: HOLIDAY_COLOR }]} />
       <Text style={styles.rowTime}>{item.time}</Text>
       <View style={styles.flex}>
         <Text style={styles.rowTitle}>{item.title}</Text>
