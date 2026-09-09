@@ -7,7 +7,17 @@ import type { BusyBlock, StoredEvent } from "../types";
 import { DayRow } from "./CalendarScreen";
 
 // Upcoming events as one scrolling list, app and phone calendar together.
-export function AgendaScreen({ events, phone, onRemove }: { events: StoredEvent[]; phone: BusyBlock[]; onRemove: (id: string) => void }) {
+export function AgendaScreen({
+  events,
+  phone,
+  onRemove,
+  onEdit,
+}: {
+  events: StoredEvent[];
+  phone: BusyBlock[];
+  onRemove: (id: string) => void;
+  onEdit: (event: StoredEvent) => void;
+}) {
   const styles = useStyles();
   const today = toDateKey(new Date());
   const sections = useMemo(() => {
@@ -31,7 +41,7 @@ export function AgendaScreen({ events, phone, onRemove }: { events: StoredEvent[
       sections={sections}
       keyExtractor={(item) => item.key}
       renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
-      renderItem={({ item }) => <DayRow item={item} onRemove={onRemove} />}
+      renderItem={({ item }) => <DayRow item={item} onRemove={onRemove} onEdit={onEdit} />}
       stickySectionHeadersEnabled={false}
       contentContainerStyle={{ paddingBottom: 100 }}
     />

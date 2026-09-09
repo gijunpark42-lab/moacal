@@ -9,15 +9,25 @@ type Picker = "date" | "start" | "end" | null;
 
 // Type an event in by hand. Produces the same ParsedEvent shape the AI path does, so saving,
 // calendar sync, reminders and conflict checks all work the same way.
-export function ManualForm({ defaultDate, onSave }: { defaultDate: string; onSave: (event: ParsedEvent) => void }) {
+export function ManualForm({
+  defaultDate,
+  initial,
+  onSave,
+}: {
+  defaultDate: string;
+  initial?: ParsedEvent; // editing an existing event
+  onSave: (event: ParsedEvent) => void;
+}) {
   const styles = useStyles();
-  const [title, setTitle] = useState("");
-  const [allDay, setAllDay] = useState(false);
-  const [date, setDate] = useState<Date>(() => toDate(defaultDate));
-  const [start, setStart] = useState<Date>(() => nextFullHour());
-  const [end, setEnd] = useState<Date>(() => new Date(nextFullHour().getTime() + 60 * 60 * 1000));
-  const [location, setLocation] = useState("");
-  const [days, setDays] = useState<Weekday[]>([]);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [allDay, setAllDay] = useState(initial?.all_day ?? false);
+  const [date, setDate] = useState<Date>(() => toDate(initial ? initial.start.slice(0, 10) : defaultDate));
+  const [start, setStart] = useState<Date>(() => (initial && initial.start.includes("T") ? toDate(initial.start) : nextFullHour()));
+  const [end, setEnd] = useState<Date>(() =>
+    initial?.end && initial.end.includes("T") ? toDate(initial.end) : new Date((initial && initial.start.includes("T") ? toDate(initial.start) : nextFullHour()).getTime() + 60 * 60 * 1000),
+  );
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [days, setDays] = useState<Weekday[]>(initial?.recurrence?.freq === "weekly" ? initial.recurrence.by_day : []);
   const [picker, setPicker] = useState<Picker>(null);
 
   const toggleDay = (d: Weekday) => setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
@@ -43,9 +53,9 @@ export function ManualForm({ defaultDate, onSave }: { defaultDate: string; onSav
       all_day: allDay,
       location: location.trim() || null,
       description: null,
-      recurrence: days.length > 0 ? { freq: "weekly", by_day: WEEKDAYS.filter((d) => days.includes(d)), until: null } : null,
+      recurrence: days.length > 0 ? { freq: "weekly", by_day: WEEKDAYS.filter((d) => days.includes(d)), until: initial?.recurrence?.until ?? null } : null,
       confidence: 1,
-      source_excerpt: "직접 입력",
+      source_excerpt: initial?.source_excerpt ?? "직접 입력",
     });
   };
 
@@ -133,7 +143,7 @@ export function ManualForm({ defaultDate, onSave }: { defaultDate: string; onSav
       </ScrollView>
       <View style={styles.footer}>
         <Pressable style={[styles.primaryBtn, styles.wide, !canSave && styles.disabled]} onPress={save} disabled={!canSave}>
-          <Text style={styles.primaryBtnText}>캘린더에 추가</Text>
+          <Text style={styles.primaryBtnText}>{initial ? "저장" : "캘린더에 추가"}</Text>
         </Pressable>
       </View>
     </View>

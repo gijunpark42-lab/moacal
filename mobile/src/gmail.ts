@@ -78,6 +78,15 @@ export async function clearScanCache(): Promise<void> {
   await AsyncStorage.removeItem(CACHE_KEY);
 }
 
+// Drop one mail from the list. Its id stays in knownIds, so it is never re-read either.
+export async function hideMessage(id: string): Promise<ScanCache | null> {
+  const cache = await loadScanCache();
+  if (!cache) return null;
+  const next = { ...cache, messages: cache.messages.filter((m) => m.id !== id) };
+  await saveScanCache(next);
+  return next;
+}
+
 // Scans only mail that arrived since the last scan and merges it into the cache.
 export async function scanGmail(days = 7): Promise<ScanCache> {
   const cache = await loadScanCache();

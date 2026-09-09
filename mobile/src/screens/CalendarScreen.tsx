@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { groupByDate, mergedItems, type DayItem } from "../agenda";
 import { formatDateHeader, KO_DAYS, monthGrid, toDateKey } from "../dates";
+import { SwipeRow } from "../components/SwipeRow";
 import { ACCENT, PHONE_COLOR, useStyles } from "../styles";
 import type { BusyBlock, StoredEvent } from "../types";
 
@@ -10,12 +11,14 @@ export function CalendarScreen({
   phone,
   onVisibleRange,
   onRemove,
+  onEdit,
   onSelectDate,
 }: {
   events: StoredEvent[];
   phone: BusyBlock[];
   onVisibleRange: (from: string, to: string) => void;
   onRemove: (id: string) => void;
+  onEdit: (event: StoredEvent) => void;
   onSelectDate: (date: string) => void; // so "+" can default to the tapped day
 }) {
   const styles = useStyles();
@@ -102,31 +105,41 @@ export function CalendarScreen({
         {dayItems.length === 0 ? (
           <Text style={[styles.emptyBody, { padding: 20 }]}>이 날은 일정이 없어요.</Text>
         ) : (
-          dayItems.map((item) => <DayRow key={item.key} item={item} onRemove={onRemove} />)
+          dayItems.map((item) => <DayRow key={item.key} item={item} onRemove={onRemove} onEdit={onEdit} />)
         )}
       </ScrollView>
     </View>
   );
 }
 
-export function DayRow({ item, onRemove }: { item: DayItem; onRemove: (id: string) => void }) {
+// Swipe left on an app event for 수정 / 삭제. Phone-calendar rows are read-only here (edit them in the calendar app).
+export function DayRow({ item, onRemove, onEdit }: { item: DayItem; onRemove: (id: string) => void; onEdit: (event: StoredEvent) => void }) {
   const styles = useStyles();
-  const confirmRemove = () => {
-    if (!item.event) return;
-    const e = item.event;
-    Alert.alert("일정 삭제", `"${e.title}"${e.recurrence ? " (반복 전체)" : ""}을 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      { text: "삭제", style: "destructive", onPress: () => onRemove(e.id) },
-    ]);
-  };
-  return (
-    <Pressable style={styles.eventRow} onLongPress={confirmRemove}>
+  const row = (
+    <View style={[styles.eventRow, { backgroundColor: "#fff" }]}>
       <View style={[styles.eventBar, item.source === "phone" && { backgroundColor: PHONE_COLOR }]} />
       <Text style={styles.rowTime}>{item.time}</Text>
       <View style={styles.flex}>
         <Text style={styles.rowTitle}>{item.title}</Text>
         {item.sub ? <Text style={styles.rowSub}>{item.sub}</Text> : null}
       </View>
-    </Pressable>
+    </View>
+  );
+  const e = item.event;
+  if (!e) return row;
+  const confirmRemove = () =>
+    Alert.alert("일정 삭제", `"${e.title}"${e.recurrence ? " (반복 전체)" : ""}을 삭제할까요?`, [
+      { text: "취소", style: "cancel" },
+      { text: "삭제", style: "destructive", onPress: () => onRemove(e.id) },
+    ]);
+  return (
+    <SwipeRow
+      actions={[
+        { label: "수정", color: ACCENT, onPress: () => onEdit(e) },
+        { label: "삭제", color: "#D92D20", onPress: confirmRemove },
+      ]}
+    >
+      {row}
+    </SwipeRow>
   );
 }

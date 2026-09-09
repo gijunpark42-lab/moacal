@@ -42,6 +42,10 @@
 - **설정** — 큰 글씨(1.3배), 폰 캘린더 연동, 알림 시간.
 - **이미지 형식 판별** — `api/lib/request.ts`가 base64 앞부분으로 jpeg/png/webp/gif를 판별. 폰이 알려주는 mimeType은 믿지 않는다 (스크린샷 PNG를 0.6 품질로 재인코딩하면 JPEG가 되는데 라벨은 PNG라 Claude가 거절했던 버그).
 - **직접 입력** — `src/screens/ManualForm.tsx`. ＋ 화면 상단 칩으로 "이메일·카톡·사진에서 찾기 / 직접 입력" 전환. 제목·날짜·시작/종료·종일·장소·매주 반복 요일. 저장 전 기존 일정과 충돌 검사(경고 후 "그래도 추가"). 캘린더에서 누른 날짜가 기본값. 날짜/시간 선택은 `@react-native-community/datetimepicker`(Expo Go 포함).
+- **스와이프 액션** — `src/components/SwipeRow.tsx`(react-native-gesture-handler Swipeable, 루트는 GestureHandlerRootView). 일정 행: 수정/삭제(길게 누르기 없음). 수정은 ManualForm에 initial을 넣어 `updateEvent()`(폰 캘린더·알림 지우고 다시 붙임). 메일 카드: 시간 변경 / 취소 메일 / 숨기기.
+- **메일 탭 표시 규칙** — 캐시된 메일 중 최근 7일치는 처리(검토)했든 안 했든 전부 보여줌(처리됨 배지, 흐리게). 보낸 사람 이메일 주소 그대로 표시, 본문의 Zoom/Meet/Teams/기타 링크 칩(탭하면 열림). 전부 토큰 0.
+- **시간 변경·취소 메일** — `src/mailTemplates.ts` + `MailActionScreen.tsx`. AI 없이 템플릿. 언어는 메일에 한글이 있으면 한국어, 아니면 영어. 말투 FORMAL/CASUAL(설정 기본값 `settings.tone`, 화면에서 바꿀 수 있음). 시간 변경은 내 일정과 안 겹치는 빈 시간 3개 제안 + 직접 선택. mailto로 메일 앱에 열어주고 전송은 사용자가.
+- **답장 초안 말투** — `/api/reply`에 `tone` 전달, 프롬프트가 메일 언어 그대로(영어 메일→영어) + FORMAL/CASUAL을 강제. Reply 화면에서 말투 바꾸고 "다시 만들기"(토큰 소모는 그때만).
 - 흐름: 캘린더/목록 → ＋ → Add(AI 또는 직접 입력) → [AI] Review(충돌 확인) → Reply(대안 제안) → 돌아옴 / [직접] 바로 저장.
 
 **아직 없는 것**:

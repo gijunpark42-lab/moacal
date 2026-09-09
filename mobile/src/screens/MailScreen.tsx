@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { SwipeRow } from "../components/SwipeRow";
 import { findConflicts } from "../conflicts";
 import { formatShort, horizon } from "../dates";
-import { connectGmail, disconnectGmail, getGmailConnection, loadHandled, loadScanCache, scanGmail, type GmailConnection } from "../gmail";
+import { connectGmail, disconnectGmail, getGmailConnection, hideMessage, loadHandled, loadScanCache, scanGmail, type GmailConnection } from "../gmail";
+import { extractLinks } from "../mailTemplates";
 import { ACCENT, useStyles } from "../styles";
 import type { BusyBlock, ScannedMessage } from "../types";
 
-// Recent inbox messages that contain events. Tap one to review its events like pasted text.
-export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (message: ScannedMessage) => void }) {
+export type MailAction = "reschedule" | "cancel";
+
+const KEEP_DAYS = 7;
+
+// Recent inbox messages that contain events. Everything shown here comes from the on-device cache;
+// only the "새 메일 확인" button talks to the server (and spends tokens).
+export function MailScreen({
+  busy,
+  onOpen,
+  onAction,
+}: {
+  busy: BusyBlock[];
+  onOpen: (message: ScannedMessage) => void;
+  onAction: (message: ScannedMessage, action: MailAction) => void;
+}) {
   const styles = useStyles();
   const [connection, setConnection] = useState<GmailConnection | null | undefined>(undefined);
   const [messages, setMessages] = useState<ScannedMessage[] | null>(null);
@@ -20,7 +35,7 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
   const scan = useCallback(async () => {
     setScanning(true);
     try {
-      const [cache, done] = await Promise.all([scanGmail(7), loadHandled()]);
+      const [cache, done] = await Promise.all([scanGmail(KEEP_DAYS), loadHandled()]);
       setMessages(cache.messages);
       setScanned(cache.lastScanned);
       setLastScanAt(cache.lastScanAt);
@@ -67,7 +82,7 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
   };
 
   const disconnect = () => {
-    Alert.alert("Gmail 연결 해제", "저장된 Gmail 연결 정보를 지울까요?", [
+    Alert.alert("Gmail 연결 해제", "저장된 Gmail 연결 정보와 메일 목록을 지울까요?", [
       { text: "취소", style: "cancel" },
       {
         text: "해제",
@@ -79,6 +94,11 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
         },
       },
     ]);
+  };
+
+  const hide = async (id: string) => {
+    const next = await hideMessage(id);
+    if (next) setMessages(next.messages);
   };
 
   if (connection === undefined) return null;
@@ -96,7 +116,9 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
   }
 
   const { from, to } = horizon(120);
-  const visible = (messages ?? []).filter((m) => !handled.has(m.id));
+  const cutoff = Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000;
+  // Everything from the last week stays visible, handled or not; nothing here costs tokens.
+  const visible = (messages ?? []).filter((m) => new Date(m.date).getTime() >= cutoff);
 
   return (
     <ScrollView contentContainerStyle={[styles.pad, { paddingBottom: 100 }]}>
@@ -113,7 +135,7 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
         {scanning ? (
           <>
             <ActivityIndicator color={ACCENT} />
-            <Text style={[styles.hint, { marginTop: 8 }]}>메일을 읽고 일정을 찾는 중이에요. 1분 정도 걸릴 수 있어요.</Text>
+            <Text style={[styles.hint, { marginTop: 8 }]}>새 메일을 읽고 일정을 찾는 중이에요.</Text>
           </>
         ) : (
           <Text style={styles.secondaryBtnText}>{lastScanAt ? "새 메일 확인" : "최근 7일 메일 확인"}</Text>
@@ -122,26 +144,50 @@ export function MailScreen({ busy, onOpen }: { busy: BusyBlock[]; onOpen: (messa
       {messages !== null && !scanning ? (
         <Text style={styles.hint}>
           {lastScanAt ? `마지막 확인 ${formatShort(new Date(lastScanAt))} · ` : ""}
-          {lastScanAt ? "새 메일" : "최근 7일 메일"} {scanned ?? 0}통 읽음 · 일정 있는 메일 {messages.length}통
-          {visible.length < messages.length ? ` · 처리한 메일 ${messages.length - visible.length}통 숨김` : ""}
+          {lastScanAt ? "새 메일" : "최근 7일 메일"} {scanned ?? 0}통 읽음 · 일정 있는 메일 {visible.length}통
         </Text>
       ) : null}
       {messages !== null && visible.length === 0 && !scanning ? <Text style={styles.emptyBody}>일정이 있는 메일이 없어요</Text> : null}
+      {visible.length > 0 ? <Text style={styles.hint}>← 옆으로 밀면 시간 변경 · 취소 메일 · 숨기기</Text> : null}
       {visible.map((m) => {
         const conflict = findConflicts(m.events, busy, from, to).size > 0;
+        const done = handled.has(m.id);
         const d = new Date(m.date);
+        const links = extractLinks(m.text);
         return (
-          <Pressable key={m.id} style={[styles.card, conflict && styles.cardConflict]} onPress={() => onOpen(m)}>
-            <View style={styles.flex}>
-              <Text style={styles.rowTitle} numberOfLines={2}>
-                {m.subject || "(제목 없음)"}
-              </Text>
-              <Text style={styles.rowSub} numberOfLines={1}>
-                {m.from} · {d.getMonth() + 1}/{d.getDate()} · 일정 {m.events.length}개
-              </Text>
-              {conflict ? <Text style={styles.warn}>⚠ 기존 일정과 겹침</Text> : null}
-            </View>
-          </Pressable>
+          <SwipeRow
+            key={m.id}
+            actions={[
+              { label: "시간 변경", color: ACCENT, onPress: () => onAction(m, "reschedule") },
+              { label: "취소 메일", color: "#B54708", onPress: () => onAction(m, "cancel") },
+              { label: "숨기기", color: "#667085", onPress: () => hide(m.id) },
+            ]}
+          >
+            <Pressable style={[styles.card, { backgroundColor: "#fff" }, conflict && !done && styles.cardConflict, done && styles.muted]} onPress={() => onOpen(m)}>
+              <View style={styles.flex}>
+                <Text style={styles.rowTitle} numberOfLines={2}>
+                  {m.subject || "(제목 없음)"}
+                </Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {m.from} · {d.getMonth() + 1}/{d.getDate()} · 일정 {m.events.length}개
+                </Text>
+                <Text style={styles.rowSub} numberOfLines={1} selectable>
+                  {m.fromEmail}
+                </Text>
+                {links.length > 0 ? (
+                  <View style={[styles.row, { gap: 6, marginTop: 6, flexWrap: "wrap" }]}>
+                    {links.map((l) => (
+                      <Pressable key={l.url} style={styles.linkChip} onPress={() => Linking.openURL(l.url).catch(() => Alert.alert("링크를 열지 못했어요", l.url))}>
+                        <Text style={styles.linkChipText}>🔗 {l.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {conflict && !done ? <Text style={styles.warn}>⚠ 기존 일정과 겹침</Text> : null}
+                {done ? <Text style={styles.badge}>처리됨</Text> : null}
+              </View>
+            </Pressable>
+          </SwipeRow>
         );
       })}
     </ScrollView>

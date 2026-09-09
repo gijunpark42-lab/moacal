@@ -16,6 +16,7 @@ import { checkAppKey } from "@/lib/request";
 
 const CONCURRENCY = 3;
 const SCAN_TEXT_CHARS = 4000; // emails rarely need more than this to find the date; keeps extraction tokens down
+// (reply tone lives in /api/reply; scanning never drafts anything)
 
 function intInRange(value: unknown, fallback: number, max: number): number | null {
   if (value === undefined) return fallback;

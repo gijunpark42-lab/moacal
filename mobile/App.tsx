@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, SafeAreaView, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import type { Source } from "./src/api";
 import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from "./src/calendar";
 import { appBusyBlocks, describeConflict, durationMinutes, findConflicts, freeSlots } from "./src/conflicts";
@@ -11,7 +12,9 @@ import { listPhoneEvents } from "./src/phoneCalendar";
 import { AddScreen } from "./src/screens/AddScreen";
 import { AgendaScreen } from "./src/screens/AgendaScreen";
 import { CalendarScreen } from "./src/screens/CalendarScreen";
-import { MailScreen } from "./src/screens/MailScreen";
+import { MailActionScreen } from "./src/screens/MailActionScreen";
+import { MailScreen, type MailAction } from "./src/screens/MailScreen";
+import { ManualForm } from "./src/screens/ManualForm";
 import { ReplyScreen } from "./src/screens/ReplyScreen";
 import { ReviewScreen, type Decision } from "./src/screens/ReviewScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
@@ -25,7 +28,9 @@ type Flow =
   | null
   | { name: "add" }
   | { name: "review"; parsed: ParsedEvent[]; notes: string; source: Source }
-  | { name: "reply"; accepted: ReplyEvent[]; declined: ReplyEvent[]; alternatives: Slot[]; source: Source };
+  | { name: "reply"; accepted: ReplyEvent[]; declined: ReplyEvent[]; alternatives: Slot[]; source: Source }
+  | { name: "edit"; event: StoredEvent }
+  | { name: "mailAction"; message: ScannedMessage; action: MailAction };
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "calendar", label: "캘린더" },
@@ -98,12 +103,8 @@ export default function App() {
     [events, phone, settings.syncCalendar, windowFrom, windowTo],
   );
 
-  // Save new events: app storage first, then the phone calendar and reminders (each best-effort).
-  const store = async (parsed: ParsedEvent[]) => {
-    const createdAt = new Date().toISOString();
-    let added: StoredEvent[] = parsed.map((p, i) => ({ ...p, id: `${Date.now()}-${i}`, createdAt }));
-    persist([...events, ...added]);
-    if (added.length === 0) return;
+  // Phone calendar entries and reminders for freshly saved events (each best-effort). Returns the events with ids attached.
+  const attach = async (added: StoredEvent[]): Promise<StoredEvent[]> => {
     if (settings.syncCalendar) {
       try {
         if (await requestPermission()) {
@@ -127,7 +128,30 @@ export default function App() {
         // Notifications unavailable on this device; skip silently.
       }
     }
+    return added;
+  };
+
+  // Save new events: app storage first, then the phone calendar and reminders.
+  const store = async (parsed: ParsedEvent[]) => {
+    const createdAt = new Date().toISOString();
+    const added: StoredEvent[] = parsed.map((p, i) => ({ ...p, id: `${Date.now()}-${i}`, createdAt }));
+    if (added.length === 0) return;
     persist([...events, ...added]);
+    const attached = await attach(added);
+    persist([...events, ...attached]);
+  };
+
+  // Edit an existing event: drop its old calendar entries and reminders, save the new version, re-attach.
+  const updateEvent = async (id: string, parsed: ParsedEvent) => {
+    const old = events.find((e) => e.id === id);
+    if (!old) return;
+    if (old.calendarEventIds?.length) await removeFromDeviceCalendar(old.calendarEventIds);
+    if (old.notificationIds?.length) await cancelReminders(old.notificationIds);
+    const updated: StoredEvent = { ...parsed, id, createdAt: old.createdAt };
+    const rest = events.filter((e) => e.id !== id);
+    persist([...rest, updated]);
+    const [attached] = await attach([updated]);
+    persist([...rest, attached]);
   };
 
   // Hand-typed event: warn about clashes, then save and go straight back to the calendar.
@@ -206,23 +230,62 @@ export default function App() {
           onConfirm={(kept, declined) => confirm(kept, declined, flow.source)}
         />
       );
-    return <ReplyScreen accepted={flow.accepted} declined={flow.declined} alternatives={flow.alternatives} source={flow.source} onDone={() => setFlow(null)} />;
+    if (flow.name === "reply")
+      return (
+        <ReplyScreen
+          accepted={flow.accepted}
+          declined={flow.declined}
+          alternatives={flow.alternatives}
+          source={flow.source}
+          defaultTone={settings.tone}
+          onDone={() => setFlow(null)}
+        />
+      );
+    if (flow.name === "edit")
+      return (
+        <View style={styles.flex}>
+          <View style={styles.header}>
+            <Pressable onPress={() => setFlow(null)} hitSlop={12}>
+              <Text style={styles.link}>‹ 뒤로</Text>
+            </Pressable>
+            <Text style={styles.h1}>일정 수정</Text>
+            <View style={{ width: 48 }} />
+          </View>
+          <ManualForm
+            defaultDate={selectedDate}
+            initial={flow.event}
+            onSave={(parsed) => {
+              updateEvent(flow.event.id, parsed);
+              setFlow(null);
+            }}
+          />
+        </View>
+      );
+    return <MailActionScreen message={flow.message} action={flow.action} busy={busy} defaultTone={settings.tone} onDone={() => setFlow(null)} />;
   };
 
   return (
-    <StylesContext.Provider value={styles}>
-      <SafeAreaView style={styles.safe}>
-        <StatusBar style="dark" />
+    <GestureHandlerRootView style={styles.flex}>
+      <StylesContext.Provider value={styles}>
+        <SafeAreaView style={styles.safe}>
+          <StatusBar style="dark" />
         {!loaded ? null : flow ? (
           renderFlow()
         ) : (
           <>
             <View style={styles.flex}>
               {tab === "calendar" && (
-                <CalendarScreen events={events} phone={phoneList} onVisibleRange={loadPhoneRange} onRemove={removeEvent} onSelectDate={setSelectedDate} />
+                <CalendarScreen
+                  events={events}
+                  phone={phoneList}
+                  onVisibleRange={loadPhoneRange}
+                  onRemove={removeEvent}
+                  onEdit={(event) => setFlow({ name: "edit", event })}
+                  onSelectDate={setSelectedDate}
+                />
               )}
-              {tab === "agenda" && <AgendaScreen events={events} phone={phoneList} onRemove={removeEvent} />}
-              {tab === "mail" && <MailScreen busy={busy} onOpen={openMail} />}
+              {tab === "agenda" && <AgendaScreen events={events} phone={phoneList} onRemove={removeEvent} onEdit={(event) => setFlow({ name: "edit", event })} />}
+              {tab === "mail" && <MailScreen busy={busy} onOpen={openMail} onAction={(message, action) => setFlow({ name: "mailAction", message, action })} />}
               {tab === "settings" && <SettingsScreen settings={settings} onChange={updateSettings} />}
               {tab !== "settings" && (
                 <Pressable style={styles.fab} onPress={() => setFlow({ name: "add" })} accessibilityLabel="일정 추가">
@@ -239,7 +302,8 @@ export default function App() {
             </View>
           </>
         )}
-      </SafeAreaView>
-    </StylesContext.Provider>
+        </SafeAreaView>
+      </StylesContext.Provider>
+    </GestureHandlerRootView>
   );
 }

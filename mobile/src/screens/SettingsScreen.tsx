@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { MOCK } from "../api";
 import { connectGmail, disconnectGmail, getGmailConnection, type GmailConnection } from "../gmail";
-import { REMINDER_OPTIONS, type Settings } from "../settings";
+import { REMINDER_OPTIONS, TONE_LABELS, type Settings, type Tone } from "../settings";
 import { ACCENT, useStyles } from "../styles";
 
 export function SettingsScreen({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
@@ -52,6 +52,20 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
             return (
               <Pressable key={m} style={[styles.chip, on && styles.chipOn]} onPress={() => onChange({ ...settings, reminderMinutes: m })}>
                 <Text style={[styles.chipText, on && styles.chipTextOn]}>{m === 0 ? "끄기" : `${m}분 전`}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+      <View style={{ paddingVertical: 10 }}>
+        <Text style={styles.rowTitle}>답장 말투</Text>
+        <Text style={styles.rowSub}>답장 초안과 시간 변경·취소 메일의 기본 말투예요. 언어는 받은 메일의 언어를 따라가요.</Text>
+        <View style={[styles.row, { gap: 8, marginTop: 10 }]}>
+          {(["formal", "casual"] as Tone[]).map((t) => {
+            const on = settings.tone === t;
+            return (
+              <Pressable key={t} style={[styles.chip, on && styles.chipOn]} onPress={() => onChange({ ...settings, tone: t })}>
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{TONE_LABELS[t]}</Text>
               </Pressable>
             );
           })}

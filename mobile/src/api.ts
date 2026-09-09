@@ -63,11 +63,11 @@ export async function parse(source: Source): Promise<ParseResult> {
   return post<ParseResult>("/api/parse", source);
 }
 
-export async function reply(source: Source, accepted: ReplyEvent[], declined: ReplyEvent[], alternatives: Slot[]): Promise<string> {
+export async function reply(source: Source, accepted: ReplyEvent[], declined: ReplyEvent[], alternatives: Slot[], tone: "formal" | "casual"): Promise<string> {
   if (MOCK) {
     await sleep(600);
     return mockReply(accepted, declined, alternatives);
   }
-  const result = await post<{ reply: string }>("/api/reply", { ...source, accepted, declined, alternatives });
+  const result = await post<{ reply: string }>("/api/reply", { ...source, accepted, declined, alternatives, tone });
   return result.reply;
 }

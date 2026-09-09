@@ -33,8 +33,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "accepted/declined must be arrays of {title, start}; alternatives of {start, end}" }, { status: 400 });
   }
 
+  const tone = read.body.tone === "casual" ? "casual" : "formal";
+
   try {
-    const reply = await draftReply({ ...read.source, accepted, declined, alternatives });
+    const reply = await draftReply({ ...read.source, accepted, declined, alternatives, tone });
     return NextResponse.json({ reply });
   } catch (error) {
     return errorResponse(error, "reply");
