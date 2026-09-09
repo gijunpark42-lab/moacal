@@ -33,6 +33,12 @@
         {
           "calendarPermission": "찾은 일정을 폰 캘린더에 넣기 위해 캘린더 접근이 필요합니다."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2D6CDF"
+        }
       ]
     ]
   }

@@ -1,6 +1,6 @@
 import { nowLocal } from "./dates";
 import { mockParse, mockReply } from "./mock";
-import type { ParsedEvent, ParseResult } from "./types";
+import type { ParseResult, ReplyEvent, Slot } from "./types";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const APP_KEY = process.env.EXPO_PUBLIC_APP_KEY;
@@ -41,12 +41,11 @@ export async function parse(source: Source): Promise<ParseResult> {
   return post<ParseResult>("/api/parse", source);
 }
 
-export async function reply(source: Source, accepted: ParsedEvent[], declined: ParsedEvent[]): Promise<string> {
-  const pick = (events: ParsedEvent[]) => events.map((e) => ({ title: e.title, start: e.start }));
+export async function reply(source: Source, accepted: ReplyEvent[], declined: ReplyEvent[], alternatives: Slot[]): Promise<string> {
   if (MOCK) {
     await sleep(600);
-    return mockReply(accepted, declined);
+    return mockReply(accepted, declined, alternatives);
   }
-  const result = await post<{ reply: string }>("/api/reply", { ...source, accepted: pick(accepted), declined: pick(declined) });
+  const result = await post<{ reply: string }>("/api/reply", { ...source, accepted, declined, alternatives });
   return result.reply;
 }

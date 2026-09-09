@@ -6,11 +6,18 @@ import { mockReply } from "./mock";
 export interface ReplyEvent {
   title: string;
   start: string; // "YYYY-MM-DDTHH:mm" or "YYYY-MM-DD"
+  conflict?: string; // what it clashes with in the user's calendar, e.g. "CS 61B 10:30–12:00"
+}
+
+export interface Slot {
+  start: string; // "YYYY-MM-DDTHH:mm"
+  end: string;
 }
 
 export interface ReplyInput extends SourceInput {
   accepted: ReplyEvent[];
   declined: ReplyEvent[];
+  alternatives: Slot[]; // free times the user could offer instead of the declined events
 }
 
 const ReplySchema = z.object({
@@ -21,18 +28,23 @@ const SYSTEM = `You draft a short reply message for the user to send back to the
 
 Rules:
 - Write in the same language and register as the source (Korean chat -> casual-polite Korean ending in 요, email -> polite email style).
-- Confirm the accepted events naturally (mention day/time so the other person can double-check). For declined events, decline politely without over-explaining.
+- Confirm the accepted events naturally (mention day/time so the other person can double-check).
+- For declined events: if a conflict reason is given, mention briefly that the user already has something then (do not name the conflicting event unless it is clearly fine to share, e.g. "수업이 있어서"). Then, if alternative slots are provided, offer two or three of them as options.
 - Keep it short: 1-4 sentences for chats, a brief paragraph for emails. No subject line, no signature, no placeholders for names.
-- Never invent new times or commitments beyond the accepted list.`;
+- Never invent times beyond the accepted list and the given alternatives.`;
 
 export async function draftReply(input: ReplyInput): Promise<string> {
   if (!LIVE) {
     console.log("[reply] mock mode: returning fixture (set PARSE_LIVE=1 to call Claude)");
-    return mockReply(input.accepted, input.declined);
+    return mockReply(input.accepted, input.declined, input.alternatives);
   }
 
-  const fmt = (e: ReplyEvent) => `- ${e.title} @ ${e.start}`;
-  const decision = `The user ACCEPTED:\n${input.accepted.map(fmt).join("\n") || "(none)"}\n\nThe user DECLINED:\n${input.declined.map(fmt).join("\n") || "(none)"}`;
+  const fmt = (e: ReplyEvent) => `- ${e.title} @ ${e.start}${e.conflict ? ` (conflicts with: ${e.conflict})` : ""}`;
+  const decision = [
+    `The user ACCEPTED:\n${input.accepted.map(fmt).join("\n") || "(none)"}`,
+    `The user DECLINED:\n${input.declined.map(fmt).join("\n") || "(none)"}`,
+    `Free alternative slots the user can offer:\n${input.alternatives.map((s) => `- ${s.start} to ${s.end}`).join("\n") || "(none)"}`,
+  ].join("\n\n");
 
   const response = await getClient().messages.parse({
     model: MODEL,

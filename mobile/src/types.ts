@@ -29,11 +29,34 @@ export interface StoredEvent extends ParsedEvent {
   id: string;
   createdAt: string;
   calendarEventIds?: string[]; // ids in the phone's calendar app, if synced
+  notificationIds?: string[]; // scheduled reminder notifications
 }
 
-// One row in the agenda: a stored event on a specific date (recurring events expand into many).
-export interface Occurrence {
-  event: StoredEvent;
+// One row in the agenda: an event on a specific date (recurring events expand into many).
+export interface Occurrence<T extends ParsedEvent = StoredEvent> {
+  event: T;
   date: string; // YYYY-MM-DD
   time: string | null; // HH:mm
+}
+
+// A concrete time range that is already taken: an app event occurrence or an event from the phone calendar.
+export interface BusyBlock {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  source: "app" | "phone";
+}
+
+// A free time range offered as an alternative. Local strings like event starts.
+export interface Slot {
+  start: string;
+  end: string;
+}
+
+export interface ReplyEvent {
+  title: string;
+  start: string;
+  conflict?: string; // what it clashes with, e.g. "CS 61B 10:30–12:00"
 }

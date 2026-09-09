@@ -73,13 +73,20 @@ export function mockParse(input: { text?: string; image?: unknown; now: string }
   };
 }
 
-export function mockReply(accepted: { title: string; start: string }[], declined: { title: string; start: string }[]): string {
+export function mockReply(
+  accepted: { title: string; start: string }[],
+  declined: { title: string; start: string; conflict?: string }[],
+  alternatives: { start: string; end: string }[],
+): string {
   const yes = accepted.map((e) => `${e.title} (${e.start.replace("T", " ")})`).join(", ");
   const no = declined.map((e) => e.title).join(", ");
+  const hasConflict = declined.some((e) => e.conflict);
+  const alts = alternatives.slice(0, 3).map((s) => s.start.replace("T", " ")).join(", ");
   return [
     "안녕하세요!",
     yes ? `${yes} 참석할게요. 일정에 넣어 두었습니다.` : "",
-    no ? `${no}는 아쉽지만 이번엔 어려울 것 같아요.` : "",
+    no ? `${no}는 ${hasConflict ? "그 시간에 다른 일정이 있어서" : "아쉽지만"} 이번엔 어려울 것 같아요.` : "",
+    no && alts ? `혹시 ${alts} 중에 괜찮은 시간 있으실까요?` : "",
     "감사합니다 :)",
     "",
     "[목 데이터] 개발 모드라 실제 답장은 생성하지 않았어요.",

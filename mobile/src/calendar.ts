@@ -1,22 +1,15 @@
 // Writes accepted events into the phone's own calendar app (Google/Samsung/iOS Calendar) via expo-calendar.
 import * as Calendar from "expo-calendar";
 import { Platform } from "react-native";
-import type { StoredEvent, Weekday } from "./types";
+import { toDate, WEEKDAYS } from "./dates";
+import type { StoredEvent } from "./types";
 
-const WEEKDAYS: Weekday[] = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 // A weekly event with no known end date (e.g. a timetable without a semester end) repeats this long.
 const DEFAULT_WEEKS = 16;
 
 type EventDetails = Parameters<Calendar.ExpoCalendar["createEvent"]>[0];
-
-function toDate(local: string): Date {
-  const [date, time] = local.split("T");
-  const [y, m, d] = date.split("-").map(Number);
-  const [h, min] = time ? time.split(":").map(Number) : [0, 0];
-  return new Date(y, m - 1, d, h, min);
-}
 
 export async function requestPermission(): Promise<boolean> {
   const { status } = await Calendar.requestCalendarPermissions();
