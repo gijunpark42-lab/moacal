@@ -96,6 +96,15 @@
 - **Google Cloud (Gmail OAuth)**: 프로젝트 `inbox-calendar` (ID `inbox-calendar-508108`), 계정 gijunpark42@gmail.com. Gmail API 활성화, OAuth 앱 "일정비서", External/**Testing** 모드(테스트 사용자만 연결 가능, 최대 100명, Audience 페이지에서 추가), 스코프 `gmail.readonly`(restricted). 웹 클라이언트 "inbox-calendar-api (Vercel)", redirect URI `https://inbox-calendar-api.vercel.app/api/gmail/callback`. 클라이언트 ID/시크릿은 Vercel 프로덕션 env `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`에만 있음 (+ `GMAIL_TOKEN_SECRET`, `PUBLIC_BASE_URL`).
 - 공개 출시(100명 초과)하려면 Google 앱 심사 필요. gmail.readonly는 restricted 스코프라 CASA 보안 평가까지 요구됨. 제품 검증 후 결정.
 
+## 배포: 남에게 앱 주기 (EAS)
+
+- Expo 프로젝트 `@gijunpark42/inbox-calendar` (id ab64d8b7-…), https://expo.dev/accounts/gijunpark42/projects/inbox-calendar. `eas-cli` 전역 설치, 로그인 계정 gijunpark42.
+- **안드로이드 APK**: `cd mobile && eas build -p android --profile preview` → expo.dev에 APK 링크 생성 → 링크를 보내면 상대가 "출처를 알 수 없는 앱 허용" 후 설치. `eas.json`의 preview 프로필이 프로덕션 API 주소와 APP_KEY를 앱에 굽는다(EXPO_PUBLIC_*; .env는 EAS에 업로드되지 않으므로 eas.json env에 둠).
+- **OTA 업데이트**: JS만 바뀐 경우 `cd mobile && eas update --branch preview --message "..."` → 설치된 앱이 다음 실행 때 자동 갱신. 네이티브 패키지를 추가했으면 다시 `eas build`.
+- **아이폰**: TestFlight는 Apple Developer Program($99/년) 필요. 그 전까진 Expo Go(개발자 PC 필요)만 가능.
+- 베타 사용자는 Google 콘솔 Audience에 gmail을 테스트 사용자로 넣어야 Gmail 연결 가능(100명, 토큰 7일 만료).
+- 패키지명 `com.gijunpark.moacal`, 버전 `app.json` version/versionCode(local).
+
 ## 실행 방법
 
 ```
