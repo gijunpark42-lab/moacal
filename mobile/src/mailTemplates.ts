@@ -1,5 +1,6 @@
 // Zero-token helpers for mail: language detection, link extraction, and template mails
 // (reschedule / cancel) in the sender's language and the user's chosen tone.
+import { Linking } from "react-native";
 import { formatShort, toDate } from "./dates";
 import type { Tone } from "./settings";
 import type { ScannedMessage } from "./types";
@@ -111,20 +112,12 @@ export function gmailComposeUrl(to: string, mail: TemplateMail): string {
 
 // Open a prefilled compose window: Gmail app first, then whatever handles mailto:. Throws if neither works.
 export async function openCompose(to: string, mail: TemplateMail): Promise<void> {
-  const { Linking } = await import("react-native");
+  const gmail = gmailComposeUrl(to, mail);
   try {
-    if (await Linking.canOpenURL(gmailComposeUrl(to, mail))) {
-      await Linking.openURL(gmailComposeUrl(to, mail));
-      return;
-    }
-  } catch {
-    // canOpenURL can throw when the scheme is not whitelisted; try opening anyway below
-  }
-  try {
-    await Linking.openURL(gmailComposeUrl(to, mail));
+    await Linking.openURL(gmail); // opens the Gmail app when installed; rejects otherwise
     return;
   } catch {
-    // Gmail app not installed
+    // Gmail app not installed (or scheme blocked): use the default mail app
   }
   await Linking.openURL(mailtoUrl(to, mail));
 }
