@@ -13,7 +13,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://inbox-calendar-api.vercel.app",
         "EXPO_PUBLIC_APP_KEY": "971461f2e27f6a1a22a0377f2983191cffd5bca5e7a926af",
-        "EXPO_PUBLIC_MOCK": ""
+        "EXPO_PUBLIC_MOCK": "0"
       }
     },
     "production": {
@@ -25,7 +25,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://inbox-calendar-api.vercel.app",
         "EXPO_PUBLIC_APP_KEY": "971461f2e27f6a1a22a0377f2983191cffd5bca5e7a926af",
-        "EXPO_PUBLIC_MOCK": ""
+        "EXPO_PUBLIC_MOCK": "0"
       }
     }
   },
