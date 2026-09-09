@@ -2,6 +2,7 @@
   "expo": {
     "name": "일정비서",
     "slug": "inbox-calendar",
+    "scheme": "inboxcalendar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -39,7 +40,9 @@
         {
           "color": "#2D6CDF"
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-secure-store"
     ]
   }
 }

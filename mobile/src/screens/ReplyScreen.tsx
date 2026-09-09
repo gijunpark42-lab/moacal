@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { reply as draftReply, type Source } from "../api";
 import { formatShort, toDate } from "../dates";
 import { ACCENT, useStyles } from "../styles";
@@ -37,6 +37,14 @@ export function ReplyScreen({
 
   // The share sheet lets the user pick Gmail, KakaoTalk, Messages, etc. Sending is always their tap.
   const share = () => draft && Share.share({ message: draft });
+  // Reply to the original mail: opens the mail app prefilled, the user still hits send.
+  const email = source.email;
+  const replyByMail = () =>
+    draft &&
+    email &&
+    Linking.openURL(`mailto:${email.to}?subject=${encodeURIComponent(`Re: ${email.subject}`)}&body=${encodeURIComponent(draft)}`).catch(() =>
+      Alert.alert("메일 앱을 열지 못했어요", "다른 앱으로 보내기를 이용해 주세요"),
+    );
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -76,9 +84,14 @@ export function ReplyScreen({
         )}
       </ScrollView>
       {draft !== null && (
-        <View style={styles.footer}>
-          <Pressable style={[styles.primaryBtn, styles.wide]} onPress={share}>
-            <Text style={styles.primaryBtnText}>이메일 · 카톡으로 보내기</Text>
+        <View style={[styles.footer, { gap: 10 }]}>
+          {email ? (
+            <Pressable style={[styles.primaryBtn, styles.wide]} onPress={replyByMail}>
+              <Text style={styles.primaryBtnText}>Gmail로 답장하기</Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={[email ? styles.secondaryBtn : styles.primaryBtn, styles.wide]} onPress={share}>
+            <Text style={email ? styles.secondaryBtnText : styles.primaryBtnText}>{email ? "다른 앱으로 보내기" : "이메일 · 카톡으로 보내기"}</Text>
           </Pressable>
         </View>
       )}

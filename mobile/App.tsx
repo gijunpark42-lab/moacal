@@ -6,19 +6,21 @@ import { addToDeviceCalendar, removeFromDeviceCalendar, requestPermission } from
 import { appBusyBlocks, describeConflict, durationMinutes, freeSlots } from "./src/conflicts";
 import { addDays, horizon, toDateKey } from "./src/dates";
 import { cancelReminders, requestNotificationPermission, scheduleReminders } from "./src/notifications";
+import { markHandled } from "./src/gmail";
 import { listPhoneEvents } from "./src/phoneCalendar";
 import { AddScreen } from "./src/screens/AddScreen";
 import { AgendaScreen } from "./src/screens/AgendaScreen";
 import { CalendarScreen } from "./src/screens/CalendarScreen";
+import { MailScreen } from "./src/screens/MailScreen";
 import { ReplyScreen } from "./src/screens/ReplyScreen";
 import { ReviewScreen, type Decision } from "./src/screens/ReviewScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./src/settings";
 import { loadEvents, saveEvents } from "./src/storage";
 import { BIG_FONT_SCALE, makeStyles, StylesContext } from "./src/styles";
-import type { BusyBlock, ParsedEvent, ReplyEvent, Slot, StoredEvent } from "./src/types";
+import type { BusyBlock, ParsedEvent, ReplyEvent, ScannedMessage, Slot, StoredEvent } from "./src/types";
 
-type Tab = "calendar" | "agenda" | "settings";
+type Tab = "calendar" | "agenda" | "mail" | "settings";
 type Flow =
   | null
   | { name: "add" }
@@ -28,6 +30,7 @@ type Flow =
 const TABS: { key: Tab; label: string }[] = [
   { key: "calendar", label: "캘린더" },
   { key: "agenda", label: "목록" },
+  { key: "mail", label: "메일" },
   { key: "settings", label: "설정" },
 ];
 
@@ -141,6 +144,17 @@ export default function App() {
     persist([...events, ...added]);
   };
 
+  // Review a mail's events; the reply can then go straight back to the sender.
+  const openMail = (message: ScannedMessage) => {
+    markHandled(message.id);
+    setFlow({
+      name: "review",
+      parsed: message.events,
+      notes: message.notes,
+      source: { text: message.text, email: { to: message.fromEmail, subject: message.subject } },
+    });
+  };
+
   const removeEvent = (id: string) => {
     const target = events.find((e) => e.id === id);
     if (target?.calendarEventIds?.length) removeFromDeviceCalendar(target.calendarEventIds);
@@ -178,6 +192,7 @@ export default function App() {
             <View style={styles.flex}>
               {tab === "calendar" && <CalendarScreen events={events} phone={phoneList} onVisibleRange={loadPhoneRange} onRemove={removeEvent} />}
               {tab === "agenda" && <AgendaScreen events={events} phone={phoneList} onRemove={removeEvent} />}
+              {tab === "mail" && <MailScreen busy={busy} onOpen={openMail} />}
               {tab === "settings" && <SettingsScreen settings={settings} onChange={updateSettings} />}
               {tab !== "settings" && (
                 <Pressable style={styles.fab} onPress={() => setFlow({ name: "add" })} accessibilityLabel="일정 추가">

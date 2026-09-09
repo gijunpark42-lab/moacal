@@ -21,12 +21,19 @@ function sniffImageType(base64: string): ImageMediaType | null {
   return null;
 }
 
-// Shared by /api/parse and /api/reply: app-key check, JSON parsing, and source validation.
-export async function readSource(req: NextRequest): Promise<{ source: SourceInput; body: RawBody } | NextResponse> {
+// Optional shared secret: when APP_KEY is set, every route requires a matching x-app-key header.
+export function checkAppKey(req: NextRequest): NextResponse | null {
   const appKey = process.env.APP_KEY;
   if (appKey && req.headers.get("x-app-key") !== appKey) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  return null;
+}
+
+// Shared by /api/parse and /api/reply: app-key check, JSON parsing, and source validation.
+export async function readSource(req: NextRequest): Promise<{ source: SourceInput; body: RawBody } | NextResponse> {
+  const denied = checkAppKey(req);
+  if (denied) return denied;
 
   let body: RawBody;
   try {

@@ -2,7 +2,7 @@ import { nowLocal } from "./dates";
 import { mockParse, mockReply } from "./mock";
 import type { ParseResult, ReplyEvent, Slot } from "./types";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const APP_KEY = process.env.EXPO_PUBLIC_APP_KEY;
 // EXPO_PUBLIC_MOCK=1 skips the server entirely. The server itself also refuses to call Claude
 // unless PARSE_LIVE=1, so development never spends API credits.
@@ -11,11 +11,21 @@ export const MOCK = process.env.EXPO_PUBLIC_MOCK === "1";
 export interface Source {
   text?: string;
   image?: { data: string; mediaType: string };
+  email?: { to: string; subject: string }; // set when the text came from a Gmail message, so Reply can answer it
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function post<T>(path: string, body: object): Promise<T> {
+export async function post<T>(path: string, body: object): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(APP_KEY ? { "x-app-key": APP_KEY } : {}) },
@@ -28,7 +38,7 @@ async function post<T>(path: string, body: object): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`);
   }
   return res.json();
 }

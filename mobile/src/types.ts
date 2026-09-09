@@ -24,6 +24,20 @@ export interface ParseResult {
   notes: string;
 }
 
+// One inbox message that /api/gmail/scan found events in.
+export interface ScannedMessage {
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string; // display name or address
+  fromEmail: string;
+  date: string; // ISO
+  snippet: string;
+  text: string; // plain body, max 6000 chars
+  events: ParsedEvent[];
+  notes: string;
+}
+
 // What we store on the device.
 export interface StoredEvent extends ParsedEvent {
   id: string;

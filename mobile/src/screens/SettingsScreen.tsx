@@ -1,10 +1,28 @@
-import { Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { MOCK } from "../api";
+import { connectGmail, disconnectGmail, getGmailConnection, type GmailConnection } from "../gmail";
 import { REMINDER_OPTIONS, type Settings } from "../settings";
 import { ACCENT, useStyles } from "../styles";
 
 export function SettingsScreen({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const styles = useStyles();
+  const [gmail, setGmail] = useState<GmailConnection | null>(null);
+  useEffect(() => {
+    getGmailConnection().then(setGmail);
+  }, []);
+  const toggleGmail = async () => {
+    try {
+      if (gmail) {
+        await disconnectGmail();
+        setGmail(null);
+      } else {
+        setGmail(await connectGmail());
+      }
+    } catch (e) {
+      Alert.alert("Gmail 연결에 실패했어요", e instanceof Error ? e.message : "다시 시도해 주세요");
+    }
+  };
   const Row = ({ label, hint, value, onValueChange }: { label: string; hint: string; value: boolean; onValueChange: (v: boolean) => void }) => (
     <View style={styles.settingRow}>
       <View style={styles.flex}>
@@ -38,6 +56,15 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
             );
           })}
         </View>
+      </View>
+      <View style={styles.settingRow}>
+        <View style={styles.flex}>
+          <Text style={styles.rowTitle}>Gmail</Text>
+          <Text style={styles.rowSub}>{gmail ? `연결됨 · ${gmail.email}` : "연결 안 됨"}</Text>
+        </View>
+        <Pressable onPress={toggleGmail} hitSlop={12}>
+          <Text style={styles.link}>{gmail ? "연결 해제" : "연결"}</Text>
+        </Pressable>
       </View>
       {MOCK ? <Text style={styles.notes}>개발 모드: 샘플 데이터를 사용하고 서버에 연결하지 않아요.</Text> : null}
     </ScrollView>
