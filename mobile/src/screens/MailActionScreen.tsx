@@ -1,9 +1,9 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useMemo, useState } from "react";
-import { Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { durationMinutes, freeSlots } from "../conflicts";
 import { formatShort, toDate, toLocalString } from "../dates";
-import { cancelMail, detectLanguage, mailtoUrl, rescheduleMail } from "../mailTemplates";
+import { cancelMail, detectLanguage, openCompose, rescheduleMail } from "../mailTemplates";
 import { TONE_LABELS, type Tone } from "../settings";
 import { useStyles } from "../styles";
 import type { BusyBlock, ScannedMessage } from "../types";
@@ -56,7 +56,7 @@ export function MailActionScreen({
   };
 
   const send = () =>
-    Linking.openURL(mailtoUrl(message.fromEmail, { subject: template.subject, body })).catch(() =>
+    openCompose(message.fromEmail, { subject: template.subject, body }).catch(() =>
       Share.share({ message: body }).catch(() => Alert.alert("메일 앱을 열지 못했어요", "본문을 복사해서 보내주세요")),
     );
 

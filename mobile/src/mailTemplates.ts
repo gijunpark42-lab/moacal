@@ -103,3 +103,28 @@ export function cancelMail(m: ScannedMessage, tone: Tone): TemplateMail {
 export function mailtoUrl(to: string, mail: TemplateMail): string {
   return `mailto:${to}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
 }
+
+// Gmail app compose link (iOS and Android). Falls back to the default mail app when Gmail isn't installed.
+export function gmailComposeUrl(to: string, mail: TemplateMail): string {
+  return `googlegmail://co?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;
+}
+
+// Open a prefilled compose window: Gmail app first, then whatever handles mailto:. Throws if neither works.
+export async function openCompose(to: string, mail: TemplateMail): Promise<void> {
+  const { Linking } = await import("react-native");
+  try {
+    if (await Linking.canOpenURL(gmailComposeUrl(to, mail))) {
+      await Linking.openURL(gmailComposeUrl(to, mail));
+      return;
+    }
+  } catch {
+    // canOpenURL can throw when the scheme is not whitelisted; try opening anyway below
+  }
+  try {
+    await Linking.openURL(gmailComposeUrl(to, mail));
+    return;
+  } catch {
+    // Gmail app not installed
+  }
+  await Linking.openURL(mailtoUrl(to, mail));
+}

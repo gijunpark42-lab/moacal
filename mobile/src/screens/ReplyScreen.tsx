@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { reply as draftReply, type Source } from "../api";
 import { formatShort, toDate } from "../dates";
-import { detectLanguage } from "../mailTemplates";
+import { detectLanguage, openCompose } from "../mailTemplates";
 import { TONE_LABELS, type Tone } from "../settings";
 import { ACCENT, useStyles } from "../styles";
 import type { ReplyEvent, Slot } from "../types";
@@ -49,9 +49,7 @@ export function ReplyScreen({
   const replyByMail = () =>
     draft &&
     email &&
-    Linking.openURL(`mailto:${email.to}?subject=${encodeURIComponent(`Re: ${email.subject}`)}&body=${encodeURIComponent(draft)}`).catch(() =>
-      Alert.alert("메일 앱을 열지 못했어요", "다른 앱으로 보내기를 이용해 주세요"),
-    );
+    openCompose(email.to, { subject: `Re: ${email.subject}`, body: draft }).catch(() => Alert.alert("메일 앱을 열지 못했어요", "다른 앱으로 보내기를 이용해 주세요"));
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>

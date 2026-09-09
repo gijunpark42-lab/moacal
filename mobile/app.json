@@ -9,7 +9,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gijunpark.moacal"
+      "bundleIdentifier": "com.gijunpark.moacal",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "googlegmail",
+          "mailto"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
