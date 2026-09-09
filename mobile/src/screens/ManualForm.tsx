@@ -56,6 +56,7 @@ export function ManualForm({
       recurrence: days.length > 0 ? { freq: "weekly", by_day: WEEKDAYS.filter((d) => days.includes(d)), until: initial?.recurrence?.until ?? null } : null,
       confidence: 1,
       source_excerpt: initial?.source_excerpt ?? "직접 입력",
+      origin: initial?.origin,
     });
   };
 

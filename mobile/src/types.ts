@@ -6,7 +6,21 @@ export interface Recurrence {
   until: string | null; // YYYY-MM-DD
 }
 
-// What the API returns for one event.
+export interface MailLink {
+  url: string;
+  label: string; // "Zoom", "Google Meet", "Teams", or the host name
+}
+
+// Where an event came from when it was found in an email. Kept with the event so the sender and the meeting link stay one tap away.
+export interface EventOrigin {
+  from: string;
+  fromEmail: string;
+  subject: string;
+  messageId: string;
+  links: MailLink[];
+}
+
+// What the API returns for one event (origin is added on the phone, not by the API).
 export interface ParsedEvent {
   title: string;
   start: string; // "YYYY-MM-DDTHH:mm" or "YYYY-MM-DD"
@@ -17,6 +31,7 @@ export interface ParsedEvent {
   recurrence: Recurrence | null;
   confidence: number;
   source_excerpt: string;
+  origin?: EventOrigin;
 }
 
 export interface ParseResult {

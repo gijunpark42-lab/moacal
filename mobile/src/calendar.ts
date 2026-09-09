@@ -16,9 +16,19 @@ export async function requestPermission(): Promise<boolean> {
   return status === "granted";
 }
 
-// The calendar new events are written to. iOS: the system default (falls back to any writable one, e.g. when iCloud
-// calendar is off); Android: the primary account calendar, else Google, else the first writable.
+function isGoogle(c: Calendar.ExpoCalendar): boolean {
+  const src = c.source;
+  return src?.type === "com.google" || /google|gmail/i.test(`${src?.name ?? ""} ${c.title ?? ""}`);
+}
+
+// The calendar new events are written to. A Google-account calendar comes first on both platforms, so what the app
+// saves shows up on calendar.google.com (and web edits flow back into the app). Then the platform default,
+// then the primary/first writable calendar.
 export async function pickWritableCalendar(): Promise<Calendar.ExpoCalendar | null> {
+  const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+  const writable = calendars.filter((c) => c.allowsModifications);
+  const google = writable.find((c) => isGoogle(c) && c.isPrimary) ?? writable.find(isGoogle);
+  if (google) return google;
   if (Platform.OS === "ios") {
     try {
       const def = Calendar.getDefaultCalendarSync();
@@ -27,22 +37,36 @@ export async function pickWritableCalendar(): Promise<Calendar.ExpoCalendar | nu
       // no default calendar (iCloud off, no accounts); fall through to the list
     }
   }
-  const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
-  const writable = calendars.filter((c) => c.allowsModifications);
-  return writable.find((c) => c.isPrimary) ?? writable.find((c) => c.source?.type === "com.google") ?? writable[0] ?? null;
+  return writable.find((c) => c.isPrimary) ?? writable[0] ?? null;
+}
+
+export async function targetIsGoogle(): Promise<boolean> {
+  const c = await pickWritableCalendar();
+  return !!c && isGoogle(c);
 }
 
 const writableCalendar = pickWritableCalendar;
 
 function details(event: StoredEvent, start: Date, rule?: Calendar.RecurrenceRule): EventDetails {
   const end = event.all_day ? new Date(start.getTime() + DAY) : event.end ? toDate(event.end) : new Date(start.getTime() + HOUR);
+  // Sender and meeting links go into the notes so they show up in the phone/Google calendar too.
+  const o = event.origin;
+  const notes = [
+    event.description,
+    o ? `보낸 사람: ${o.from} <${o.fromEmail}>` : null,
+    ...(o?.links ?? []).map((l) => `${l.label}: ${l.url}`),
+    o ? `메일 제목: ${o.subject}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
   return {
     title: event.title,
     startDate: start,
     endDate: end,
     allDay: event.all_day,
     location: event.location,
-    notes: event.description ?? undefined,
+    notes: notes || undefined,
+    url: o?.links[0]?.url,
     recurrenceRule: rule,
   };
 }

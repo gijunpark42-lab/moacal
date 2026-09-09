@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { groupByDate, mergedItems, type DayItem } from "../agenda";
 import { formatDateHeader, KO_DAYS, monthGrid, toDateKey } from "../dates";
 import { SwipeRow } from "../components/SwipeRow";
@@ -133,6 +133,15 @@ export function DayRow({ item, onRemove, onEdit }: { item: DayItem; onRemove: (i
       <View style={styles.flex}>
         <Text style={styles.rowTitle}>{item.title}</Text>
         {item.sub ? <Text style={styles.rowSub}>{item.sub}</Text> : null}
+        {item.links && item.links.length > 0 ? (
+          <View style={[styles.row, { gap: 6, marginTop: 6, flexWrap: "wrap" }]}>
+            {item.links.map((l) => (
+              <Pressable key={l.url} style={styles.linkChip} onPress={() => Linking.openURL(l.url).catch(() => Alert.alert("링크를 열지 못했어요", l.url))}>
+                <Text style={styles.linkChipText}>🔗 {l.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
     </View>
   );

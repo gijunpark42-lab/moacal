@@ -45,6 +45,8 @@
 - **한국 공휴일** — `src/holidays.ts` 정적 표, 대체공휴일 포함 2027-12까지(규정: 설·추석은 일요일/다른 공휴일 겹침만, 삼일절·어린이날·광복절·개천절·한글날·부처님오신날·성탄절은 토·일 겹침도 대체, 신정·현충일 대체 없음). 캘린더에 빨간 날짜+이름, 목록에 "공휴일" 행. 충돌 검사엔 안 들어감. 매년 표 연장 필요.
 - **폰 캘린더 연동 수정** — 예전엔 일정을 추가하는 순간에만 권한을 요청해서 그 전엔 폰 일정이 안 보였음. 이제 앱 시작 시 권한 요청 후 로드, 설정에 연동 상태(권한·캘린더 수·쓰는 캘린더 이름)와 "권한 요청/설정 열기" 표시. iOS 기본 캘린더가 없으면 쓰기 가능한 첫 캘린더로 폴백.
 - **SafeArea** — react-native-safe-area-context의 SafeAreaProvider/SafeAreaView 사용(RN 기본 SafeAreaView deprecated).
+- **메일 출처 보존** — 메일에서 검토한 일정은 `origin`(보낸 사람·이메일·제목·메시지 id·본문 링크)을 갖고 저장. 캘린더/목록 행에 보낸 사람과 링크 칩(Zoom/Meet/Teams, 탭하면 열림), 폰 캘린더 메모와 url 필드에도 기록.
+- **폰↔웹 동기화 전략** — 별도 계정·DB 없이, 앱이 쓰는 폰 캘린더를 **구글 계정 캘린더 우선**으로 고름(`pickWritableCalendar`). 그러면 앱→calendar.google.com, 웹→앱(폰 캘린더 읽기) 양방향이 공짜로 된다. 앱 전용 데이터(메일 캐시·설정)는 기기에만. 진짜 계정+웹 대시보드는 미정: Google 로그인 + Neon(Postgres) + 동기화 API + Next.js 웹 UI 규모.
 - **직접 입력** — `src/screens/ManualForm.tsx`. ＋ 화면 상단 칩으로 "이메일·카톡·사진에서 찾기 / 직접 입력" 전환. 제목·날짜·시작/종료·종일·장소·매주 반복 요일. 저장 전 기존 일정과 충돌 검사(경고 후 "그래도 추가"). 캘린더에서 누른 날짜가 기본값. 날짜/시간 선택은 `@react-native-community/datetimepicker`(Expo Go 포함).
 - **스와이프 액션** — `src/components/SwipeRow.tsx`(react-native-gesture-handler Swipeable, 루트는 GestureHandlerRootView). 일정 행: 수정/삭제(길게 누르기 없음). 수정은 ManualForm에 initial을 넣어 `updateEvent()`(폰 캘린더·알림 지우고 다시 붙임). 메일 카드: 시간 변경 / 취소 메일 / 숨기기.
 - **메일 탭 표시 규칙** — 캐시된 메일 중 최근 7일치는 처리(검토)했든 안 했든 전부 보여줌(처리됨 배지, 흐리게). 보낸 사람 이메일 주소 그대로 표시, 본문의 Zoom/Meet/Teams/기타 링크 칩(탭하면 열림). 전부 토큰 0.

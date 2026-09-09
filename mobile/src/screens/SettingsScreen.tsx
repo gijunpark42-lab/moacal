@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { MOCK } from "../api";
-import { requestPermission } from "../calendar";
+import { requestPermission, targetIsGoogle } from "../calendar";
 import { connectGmail, disconnectGmail, getGmailConnection, type GmailConnection } from "../gmail";
 import { calendarStatus, type CalendarStatus } from "../phoneCalendar";
 import { REMINDER_OPTIONS, TONE_LABELS, type Settings, type Tone } from "../settings";
@@ -19,9 +19,13 @@ export function SettingsScreen({
   const styles = useStyles();
   const [gmail, setGmail] = useState<GmailConnection | null>(null);
   const [cal, setCal] = useState<CalendarStatus | null>(null);
+  const [googleTarget, setGoogleTarget] = useState(false);
   useEffect(() => {
     getGmailConnection().then(setGmail);
     calendarStatus().then(setCal);
+    targetIsGoogle()
+      .then(setGoogleTarget)
+      .catch(() => setGoogleTarget(false));
   }, []);
   const fixCalendar = async () => {
     if (cal?.permission === "denied") {
@@ -77,11 +81,20 @@ export function SettingsScreen({
         }}
       />
       {settings.syncCalendar ? (
-        <View style={[styles.row, { gap: 12, paddingLeft: 4 }]}>
-          <Text style={[styles.rowSub, styles.flex]}>{calendarLine}</Text>
-          {cal && (cal.permission !== "granted" || !cal.writable) ? (
-            <Pressable onPress={fixCalendar} hitSlop={12}>
-              <Text style={styles.link}>{cal.permission === "denied" ? "설정 열기" : "권한 요청"}</Text>
+        <View style={{ gap: 6, paddingLeft: 4 }}>
+          <View style={[styles.row, { gap: 12 }]}>
+            <Text style={[styles.rowSub, styles.flex]}>{calendarLine}</Text>
+            {cal && (cal.permission !== "granted" || !cal.writable) ? (
+              <Pressable onPress={fixCalendar} hitSlop={12}>
+                <Text style={styles.link}>{cal.permission === "denied" ? "설정 열기" : "권한 요청"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {cal?.writable ? (
+            <Pressable onPress={() => Linking.openURL("https://calendar.google.com/")} hitSlop={8}>
+              <Text style={[styles.rowSub, { color: ACCENT }]}>
+                {googleTarget ? "구글 캘린더에 저장돼요 → 웹(calendar.google.com)에서도 같은 일정을 볼 수 있어요" : "구글 계정 캘린더를 폰에 추가하면 웹에서도 같은 일정을 볼 수 있어요 · calendar.google.com"}
+              </Text>
             </Pressable>
           ) : null}
         </View>

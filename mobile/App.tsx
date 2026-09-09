@@ -9,6 +9,7 @@ import { appBusyBlocks, describeConflict, durationMinutes, findConflicts, freeSl
 import { addDays, horizon, toDateKey } from "./src/dates";
 import { cancelReminders, requestNotificationPermission, scheduleReminders } from "./src/notifications";
 import { markHandled } from "./src/gmail";
+import { extractLinks } from "./src/mailTemplates";
 import { listPhoneEvents } from "./src/phoneCalendar";
 import { AddScreen } from "./src/screens/AddScreen";
 import { AgendaScreen } from "./src/screens/AgendaScreen";
@@ -199,9 +200,10 @@ export default function App() {
   // Review a mail's events; the reply can then go straight back to the sender.
   const openMail = (message: ScannedMessage) => {
     markHandled(message.id);
+    const origin = { from: message.from, fromEmail: message.fromEmail, subject: message.subject, messageId: message.id, links: extractLinks(message.text) };
     setFlow({
       name: "review",
-      parsed: message.events,
+      parsed: message.events.map((e) => ({ ...e, origin })),
       notes: message.notes,
       source: { text: message.text, email: { to: message.fromEmail, subject: message.subject } },
     });

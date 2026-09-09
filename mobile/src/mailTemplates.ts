@@ -19,10 +19,8 @@ export function detectLanguage(text: string): Lang {
   return "en";
 }
 
-export interface MailLink {
-  url: string;
-  label: string; // "Zoom", "Google Meet", "Teams", or the host name
-}
+export type { MailLink } from "./types";
+import type { MailLink } from "./types";
 
 const LINK_RE = /https?:\/\/[^\s<>()"'\]]+/g;
 

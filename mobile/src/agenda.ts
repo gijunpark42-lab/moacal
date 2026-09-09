@@ -1,7 +1,7 @@
 // Merges app events, phone-calendar events and public holidays into one list of rows per day.
 import { addDays, describeRecurrence, expand, formatTime, formatTimeRange, toDateKey } from "./dates";
 import { HOLIDAYS } from "./holidays";
-import type { BusyBlock, StoredEvent } from "./types";
+import type { BusyBlock, MailLink, StoredEvent } from "./types";
 
 export interface DayItem {
   key: string;
@@ -12,6 +12,7 @@ export interface DayItem {
   sub: string | null;
   source: "app" | "phone" | "holiday";
   event?: StoredEvent; // present for app rows so they can be edited/deleted
+  links?: MailLink[]; // meeting links from the originating email
 }
 
 export function mergedItems(events: StoredEvent[], phone: BusyBlock[], from: string, to: string): DayItem[] {
@@ -27,9 +28,10 @@ export function mergedItems(events: StoredEvent[], phone: BusyBlock[], from: str
       sortKey: o.time ?? " ",
       time: formatTimeRange(o.event),
       title: o.event.title,
-      sub: [o.event.location, describeRecurrence(o.event)].filter(Boolean).join(" · ") || null,
+      sub: [o.event.location, describeRecurrence(o.event), o.event.origin ? `${o.event.origin.from} · ${o.event.origin.fromEmail}` : null].filter(Boolean).join(" · ") || null,
       source: "app",
       event: o.event,
+      links: o.event.origin?.links,
     });
   }
   for (const b of phone) {
