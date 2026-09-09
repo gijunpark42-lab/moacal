@@ -43,7 +43,7 @@
 - 흐름: 캘린더/목록 → ＋ → Add → Review(충돌 확인) → Reply(대안 제안) → 돌아옴.
 
 **아직 없는 것**:
-- **Gmail 받은편지함 자동 연동** — 지금은 이메일 본문을 붙여넣는 방식. 자동으로 하려면 Gmail API + Google OAuth 앱 심사 필요. "이메일 오면 충돌 알림"은 이게 있어야 가능.
+- **백그라운드 메일 감시** — Gmail 연동은 됐지만(메일 탭에서 스캔), 앱을 열지 않아도 새 메일을 감지해 알림을 보내려면 서버 폴링이나 dev build의 background task가 필요.
 - 안드로이드 공유 시트로 받기(share intent, dev build 필요), 카톡 봇, 사용자 계정, 결제.
 
 ## 정해진 설계 결정
@@ -67,12 +67,12 @@
 ## 다음 할 일 (후보 — 우선순위는 사용자가 정한다)
 
 1. **폰에서 직접 돌려보기** — 캘린더 탭, 폰 캘린더 일정 표시, 충돌 팝업, 알림 권한, 큰 글씨 확인 (목 모드로)
-2. **Gmail 연동** — 받은편지함에서 일정 있는 메일을 자동으로 가져와 충돌 확인까지. Google Cloud 프로젝트 + OAuth 동의화면 + gmail.readonly 스코프. 심사 전엔 테스트 사용자 100명 제한.
+2. **Gmail 연동 실기기 테스트** — 메일 탭 → Gmail 연결 → 구글 동의 → 앱 복귀(deep link) → 스캔까지 폰에서 확인. Expo Go에서 exp:// 복귀가 막히면 dev build 검토.
 3. **안드로이드 공유 시트 연동** — 카톡/메일에서 "공유 → 일정비서"로 바로 보내기 (Expo Go 불가, dev build 필요)
 4. **실제 입력으로 정확도 테스트** — 베타 사용자의 실제 캡처로. 개발자가 로컬에서 API를 돌려보는 건 금지
 5. **프로덕션 모델 구성** — 싼 분류기 + Sonnet 5 추출로 교체
 
-완료: 목 모드, 기기 캘린더 쓰기, 답장 초안, 큰 글씨 모드, 캘린더 UI, 폰 캘린더 통합, 충돌 감지+대안 시간, 리마인더 알림 (2026-09-09)
+완료: 목 모드, 기기 캘린더 쓰기, 답장 초안, 큰 글씨 모드, 캘린더 UI, 폰 캘린더 통합, 충돌 감지+대안 시간, 리마인더 알림, Gmail 연동(OAuth+스캔+메일 탭) (2026-09-09)
 
 ## 배포 (2026-09-09)
 
@@ -83,6 +83,8 @@
 - 수동 재배포: `cd api && vercel --prod`. 환경변수 변경: `vercel env add NAME production`.
 - 폰 앱은 `mobile/.env`(gitignore됨)에 위 URL과 `APP_KEY`가 들어 있다. `EXPO_PUBLIC_MOCK=1`로 바꾸면 개발 모드.
 - GitHub: https://github.com/gijunpark42-lab/inbox-calendar (private)
+- **Google Cloud (Gmail OAuth)**: 프로젝트 `inbox-calendar` (ID `inbox-calendar-508108`), 계정 gijunpark42@gmail.com. Gmail API 활성화, OAuth 앱 "일정비서", External/**Testing** 모드(테스트 사용자만 연결 가능, 최대 100명, Audience 페이지에서 추가), 스코프 `gmail.readonly`(restricted). 웹 클라이언트 "inbox-calendar-api (Vercel)", redirect URI `https://inbox-calendar-api.vercel.app/api/gmail/callback`. 클라이언트 ID/시크릿은 Vercel 프로덕션 env `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`에만 있음 (+ `GMAIL_TOKEN_SECRET`, `PUBLIC_BASE_URL`).
+- 공개 출시(100명 초과)하려면 Google 앱 심사 필요. gmail.readonly는 restricted 스코프라 CASA 보안 평가까지 요구됨. 제품 검증 후 결정.
 
 ## 실행 방법
 
